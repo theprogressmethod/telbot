@@ -500,23 +500,33 @@ async def start_handler(message: Message):
     # Test database on first interaction
     db_test = await DatabaseManager.test_database()
     
-    welcome_text = """Welcome to the Progress Method Accountability Bot! 🎯
+    user_name = message.from_user.first_name or "there"
+    
+    welcome_text = f"""Welcome {user_name}! 👋
 
-I help you track your commitments and build consistency.
+I'm your **Progress Method Accountability Bot** 🎯
 
-Commands:
-/commit <text> - Add a new commitment
-/done - Mark commitments as complete
-/list - View your active commitments
-/help - Show this help message
-/dbtest - Test database connection
+I'll help you turn goals into reality by:
+• Tracking your daily commitments 📝
+• Making them SMART with AI analysis 🧠
+• Celebrating your wins 🎉
 
-Let's build better habits together! 💪"""
+**Get Started:**
+👉 /commit - Add your first commitment
+Example: `/commit Read for 30 minutes today`
+
+**Other Commands:**
+📋 /list - View active commitments
+✅ /done - Mark commitments complete
+💬 /feedback - Send suggestions
+❓ /help - See all features
+
+Ready to build better habits? Let's go! 🚀"""
     
     if not db_test:
         welcome_text += "\n\n⚠️ Note: Database connection issue detected. Some features may not work properly."
     
-    await message.answer(welcome_text)
+    await message.answer(welcome_text, parse_mode="Markdown")
 
 @dp.message(Command("dbtest"))
 async def dbtest_handler(message: Message):
