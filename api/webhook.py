@@ -1,4 +1,3 @@
-from http.server import BaseHTTPRequestHandler
 import json
 import logging
 import os
@@ -21,10 +20,6 @@ import openai
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Import configuration and handlers from main telbot module
-import sys
-sys.path.append('../')
 
 # Configuration Class
 class Config:
@@ -488,39 +483,99 @@ async def handle_text_messages(message: Message):
         "/help - See all commands"
     )
 
-class handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        """Handle incoming webhook requests"""
-        try:
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            data = json.loads(post_data.decode('utf-8'))
-            
-            # Create Update object from webhook data
-            update = Update.model_validate(data)
-            
-            # Process the update asynchronously
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(dp.feed_update(bot, update))
-            loop.close()
-            
-            # Send response
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"status": "ok"}).encode())
-            
-        except Exception as e:
-            logger.error(f"Error processing webhook: {e}")
-            self.send_response(500)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}).encode())
-    
-    def do_GET(self):
-        """Handle GET requests for health check"""
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
-        self.wfile.write(json.dumps({"status": "Bot is running"}).encode())
+async def handler(request):
+    """Vercel serverless function handler"""
+    try:
+        # Handle different HTTP methods
+        if request.method == 'GET':
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({"status": "Bot is running", "method": "GET"})
+            }
+        
+        if request.method != 'POST':
+            return {
+                'statusCode': 405,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({"error": "Method not allowed"})
+            }
+        
+        # Get request body
+        if hasattr(request, 'body'):
+            body = request.body
+        elif hasattr(request, 'data'):
+            body = request.data
+        else:
+            # Try to read from request
+            body = await request.read() if hasattr(request, 'read') else request
+        
+        # Parse JSON data
+        if isinstance(body, bytes):
+            data = json.loads(body.decode('utf-8'))
+        elif isinstance(body, str):
+            data = json.loads(body)
+        else:
+            data = body
+        
+        logger.info(f"Received webhook data: {data}")
+        
+        # Create Update object from webhook data
+        update = Update.model_validate(data)
+        
+        # Process the update
+        await dp.feed_update(bot, update)
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({"status": "ok"})
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing webhook: {e}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        return {
+            'statusCode': 500,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({"error": str(e), "type": type(e).__name__})
+        }
+
+# Alternative handler format for Vercel
+def lambda_handler(event, context):
+    """Alternative lambda-style handler"""
+    try:
+        # Get body from event
+        body = event.get('body', '{}')
+        if isinstance(body, str):
+            data = json.loads(body)
+        else:
+            data = body
+        
+        logger.info(f"Lambda handler received: {data}")
+        
+        # Create Update object
+        update = Update.model_validate(data)
+        
+        # Process update in event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(dp.feed_update(bot, update))
+        loop.close()
+        
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({"status": "ok"})
+        }
+        
+    except Exception as e:
+        logger.error(f"Lambda handler error: {e}")
+        return {
+            'statusCode': 500,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({"error": str(e)})
+        }
