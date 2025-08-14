@@ -239,15 +239,17 @@ class UserAnalytics:
     async def _calculate_total_points(self, user_id: str) -> int:
         """Calculate total points from commitments and achievements"""
         try:
-            # Base points from commitments
-            commitments = self.supabase.table("commitments").select("status").eq("user_id", user_id).execute()
+            # Base points from commitments (only quality commitments count)
+            commitments = self.supabase.table("commitments").select("status, smart_score").eq("user_id", user_id).execute()
             
             base_points = 0
             for c in commitments.data:
-                if c.get("status") == "completed":
-                    base_points += 10  # 10 points per completion
-                else:
-                    base_points += 2   # 2 points for trying
+                smart_score = c.get("smart_score", 0)
+                if smart_score >= 7:  # Only high-quality commitments earn points
+                    if c.get("status") == "completed":
+                        base_points += 10  # 10 points per quality completion
+                    else:
+                        base_points += 2   # 2 points for quality attempt
             
             # Bonus points from achievements
             achievements = await self._get_user_achievements(user_id)
