@@ -241,6 +241,28 @@ async def get_webhook_info():
         logger.error(f"❌ Error getting webhook info: {e}")
         return {"status": "error", "message": str(e)}
 
+@app.get("/refresh_commands")
+async def refresh_commands():
+    """Refresh bot commands in Telegram menu"""
+    try:
+        await set_bot_commands()
+        logger.info("✅ Bot commands refreshed successfully")
+        return {
+            "status": "success", 
+            "message": "Bot commands refreshed successfully",
+            "commands": [
+                "/start - Welcome message",
+                "/commit - Add a new commitment", 
+                "/done - Mark commitments as complete",
+                "/list - View your active commitments",
+                "/feedback - Send feedback or suggestions",
+                "/help - Show help message"
+            ]
+        }
+    except Exception as e:
+        logger.error(f"❌ Error refreshing commands: {e}")
+        return {"status": "error", "message": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
