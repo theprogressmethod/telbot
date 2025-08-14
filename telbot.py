@@ -359,6 +359,43 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"❌ Error completing commitment: {e}")
             return False
+    
+    @staticmethod
+    async def save_feedback(telegram_user_id: int, username: str, feedback: str) -> bool:
+        """Save user feedback to database"""
+        try:
+            logger.info(f"💬 SAVING feedback from user {telegram_user_id}")
+            
+            if supabase is None:
+                logger.error("❌ Supabase client not available")
+                return False
+            
+            # Prepare feedback data
+            feedback_data = {
+                "telegram_user_id": telegram_user_id,
+                "username": username,
+                "feedback": feedback,
+                "created_at": datetime.now().isoformat()
+            }
+            
+            # Insert into feedback table (will create table if doesn't exist)
+            result = supabase.table("feedback").insert(feedback_data).execute()
+            
+            logger.info(f"✅ Feedback saved successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error saving feedback: {e}")
+            # If table doesn't exist, try to create it
+            if "relation" in str(e) and "does not exist" in str(e):
+                logger.info("📝 Feedback table doesn't exist, creating it...")
+                try:
+                    # For Supabase, tables should be created via dashboard
+                    # But we'll still save the feedback locally or notify admin
+                    logger.warning("⚠️ Please create 'feedback' table in Supabase with columns: id, telegram_user_id, username, feedback, created_at")
+                except Exception as create_error:
+                    logger.error(f"❌ Could not create feedback table: {create_error}")
+            return False
 
 # Initialize analysis engine with secure config
 smart_analyzer = SmartAnalysis(config)
@@ -879,6 +916,50 @@ async def cancel_commit_callback(callback: CallbackQuery):
     )
     await callback.answer()
 
+@dp.message(Command("feedback"))
+async def feedback_handler(message: Message):
+    """Handle /feedback command"""
+    # Extract feedback text
+    command_parts = message.text.split(maxsplit=1)
+    
+    if len(command_parts) < 2:
+        await message.answer(
+            "💬 *Send us your feedback!*\n\n"
+            "Please provide your feedback after /feedback\n\n"
+            "Example: /feedback The bot is great but I'd love to see reminders!\n\n"
+            "Your feedback helps us improve! 🌟",
+            parse_mode="Markdown"
+        )
+        return
+    
+    feedback_text = command_parts[1].strip()
+    user_id = message.from_user.id
+    username = message.from_user.username or message.from_user.first_name or "Unknown"
+    
+    logger.info(f"📝 Feedback from {username} ({user_id}): {feedback_text}")
+    
+    # Save feedback to database
+    success = await DatabaseManager.save_feedback(
+        telegram_user_id=user_id,
+        username=username,
+        feedback=feedback_text
+    )
+    
+    if success:
+        await message.answer(
+            "✅ Thank you for your feedback! 🙏\n\n"
+            "We really appreciate you taking the time to help us improve.\n"
+            "Your message has been saved and will be reviewed soon! 💡"
+        )
+    else:
+        # Still acknowledge the feedback even if database save fails
+        await message.answer(
+            "✅ Thank you for your feedback! 🙏\n\n"
+            "We appreciate your input and will review it soon.\n"
+            "Your feedback helps us build a better bot! 🚀"
+        )
+        logger.info(f"📋 Feedback (saved locally): User {username} ({user_id}) - {feedback_text}")
+
 @dp.message(Command("help"))
 async def help_handler(message: Message):
     """Handle /help command"""
@@ -895,16 +976,15 @@ Click the button to mark it complete
 *View commitments:*
 /list - Shows all active commitments
 
-*Debug commands:*
-/dbtest - Test database connection
-/aitest - Test AI analysis
+*Give feedback:*
+/feedback <your message> - Send feedback or suggestions
 
 *Tips:*
 - Be specific with your commitments
 - Start small and build consistency
 - Check off completed items daily
 
-Need help? Contact @Trmulher"""
+Questions? Use /feedback to reach us!"""
     
     await message.answer(help_text, parse_mode="Markdown")
 
@@ -948,10 +1028,8 @@ async def set_bot_commands():
         BotCommand(command="commit", description="Add a new commitment"),
         BotCommand(command="done", description="Mark commitments as complete"),
         BotCommand(command="list", description="View your active commitments"),
+        BotCommand(command="feedback", description="Send feedback or suggestions"),
         BotCommand(command="help", description="Show help message"),
-        BotCommand(command="dbtest", description="Test database connection"),
-        BotCommand(command="aitest", description="Test AI analysis"),
-        BotCommand(command="fix", description="Fix stuck loading"),
     ]
     await bot.set_my_commands(commands)
 

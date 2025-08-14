@@ -17,7 +17,7 @@ from contextlib import asynccontextmanager
 from telbot import (
     Config, SmartAnalysis, DatabaseManager, bot, dp,
     start_handler, commit_handler, list_handler, done_handler,
-    help_handler, handle_text_messages, complete_commitment_callback,
+    help_handler, feedback_handler, handle_text_messages, complete_commitment_callback,
     save_smart_callback, save_original_callback, cancel_commit_callback,
     cancel_done_callback, set_bot_commands
 )
@@ -55,6 +55,7 @@ async def lifespan(app: FastAPI):
         dp.message.register(commit_handler, Command("commit"))
         dp.message.register(list_handler, Command("list"))
         dp.message.register(done_handler, Command("done"))
+        dp.message.register(feedback_handler, Command("feedback"))
         dp.message.register(help_handler, Command("help"))
         dp.message.register(handle_text_messages)
         
