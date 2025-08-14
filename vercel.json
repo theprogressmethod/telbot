@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "api/webhook.py": {
+      "runtime": "python3.9"
+    }
+  },
+  "env": {
+    "BOT_TOKEN": "@bot_token",
+    "SUPABASE_URL": "@supabase_url",
+    "SUPABASE_KEY": "@supabase_key",
+    "OPENAI_API_KEY": "@openai_api_key"
+  }
+}
