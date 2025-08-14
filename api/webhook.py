@@ -2,6 +2,8 @@ from http.server import BaseHTTPRequestHandler
 import json
 import logging
 import os
+import asyncio
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -9,108 +11,107 @@ logger = logging.getLogger(__name__)
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        """Handle GET requests for health check"""
-        try:
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            
-            response = {
-                "status": "Telegram Bot Webhook is running",
-                "method": "GET",
-                "env_vars_set": {
-                    "BOT_TOKEN": bool(os.getenv("BOT_TOKEN")),
-                    "SUPABASE_URL": bool(os.getenv("SUPABASE_URL")),
-                    "SUPABASE_KEY": bool(os.getenv("SUPABASE_KEY")),
-                    "OPENAI_API_KEY": bool(os.getenv("OPENAI_API_KEY"))
-                }
+        """Handle GET requests - health check"""
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        
+        response = {
+            "status": "Telegram Bot Webhook Active",
+            "timestamp": datetime.now().isoformat(),
+            "env_check": {
+                "BOT_TOKEN": bool(os.getenv("BOT_TOKEN")),
+                "SUPABASE_URL": bool(os.getenv("SUPABASE_URL")),
+                "SUPABASE_KEY": bool(os.getenv("SUPABASE_KEY")),
+                "OPENAI_API_KEY": bool(os.getenv("OPENAI_API_KEY"))
             }
-            
-            self.wfile.write(json.dumps(response).encode())
-            
-        except Exception as e:
-            logger.error(f"GET error: {e}")
-            self.send_response(500)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}).encode())
+        }
+        
+        self.wfile.write(json.dumps(response).encode())
     
     def do_POST(self):
         """Handle POST requests from Telegram"""
         try:
-            # Read the request body
+            # Read request body
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length > 0:
                 post_data = self.rfile.read(content_length)
-                webhook_data = json.loads(post_data.decode('utf-8'))
+                data = json.loads(post_data.decode('utf-8'))
             else:
-                webhook_data = {}
+                data = {}
             
-            logger.info(f"Received webhook data: {json.dumps(webhook_data, indent=2)}")
+            logger.info(f"📨 Webhook received: {json.dumps(data, indent=2)}")
             
-            # Check if we have environment variables
-            bot_token = os.getenv("BOT_TOKEN")
-            if not bot_token:
-                logger.error("BOT_TOKEN not set")
-                self.send_response(500)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": "BOT_TOKEN not configured"}).encode())
-                return
-            
-            # Import and process with aiogram
-            try:
-                import asyncio
-                from aiogram import Bot, Dispatcher
-                from aiogram.types import Update
-                from aiogram.fsm.storage.memory import MemoryStorage
-                
-                # Import handlers
-                from . import bot_handlers
-                
-                # Create bot and dispatcher
-                bot = Bot(token=bot_token)
-                dp = Dispatcher(storage=MemoryStorage())
-                
-                # Register handlers
-                bot_handlers.register_handlers(dp)
-                
-                # Process update
-                update = Update.model_validate(webhook_data)
-                
-                # Run in event loop
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(dp.feed_update(bot, update))
-                loop.close()
-                
-                logger.info("Successfully processed webhook")
-                
-            except Exception as bot_error:
-                logger.error(f"Bot processing error: {bot_error}")
-                # Still return 200 to Telegram so it doesn't retry
+            # Process with bot
+            self.process_telegram_update(data)
             
             # Always return 200 to Telegram
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            
-            response = {
-                "status": "received",
-                "update_id": webhook_data.get("update_id"),
-                "has_message": "message" in webhook_data,
-                "message_text": webhook_data.get("message", {}).get("text", "")
-            }
-            
-            self.wfile.write(json.dumps(response).encode())
+            self.wfile.write(json.dumps({"status": "ok"}).encode())
             
         except Exception as e:
-            logger.error(f"POST error: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            
+            logger.error(f"❌ Webhook error: {e}")
             # Still return 200 to prevent Telegram retries
             self.send_response(200)
-            self.send_header('Content-type', 'application/json')
+            self.send_header('Content-type', 'application/json') 
             self.end_headers()
             self.wfile.write(json.dumps({"status": "error", "error": str(e)}).encode())
+    
+    def process_telegram_update(self, data):
+        """Process Telegram update with asyncio"""
+        try:
+            # Import all the bot components
+            import asyncio
+            from aiogram import Bot, Dispatcher
+            from aiogram.types import Update
+            from aiogram.fsm.storage.memory import MemoryStorage
+            
+            # Import our bot configuration and handlers from the parent directory
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+            
+            # Now we can import from telbot.py (in parent directory)
+            from telbot import Config, SmartAnalysis, DatabaseManager
+            from telbot import (
+                start_handler, commit_handler, list_handler, done_handler,
+                help_handler, handle_text_messages, complete_commitment_callback,
+                save_smart_callback, save_original_callback
+            )
+            from aiogram import F
+            from aiogram.filters import Command, CommandStart
+            
+            # Initialize everything
+            config = Config()
+            bot = Bot(token=config.bot_token)
+            dp = Dispatcher(storage=MemoryStorage())
+            
+            # Register handlers
+            dp.message.register(start_handler, CommandStart())
+            dp.message.register(commit_handler, Command("commit"))
+            dp.message.register(list_handler, Command("list"))
+            dp.message.register(done_handler, Command("done"))
+            dp.message.register(help_handler, Command("help"))
+            dp.message.register(handle_text_messages)
+            
+            dp.callback_query.register(complete_commitment_callback, F.data.startswith("complete_"))
+            dp.callback_query.register(save_smart_callback, F.data.startswith("save_smart_"))
+            dp.callback_query.register(save_original_callback, F.data.startswith("save_original_"))
+            
+            # Process the update
+            update = Update.model_validate(data)
+            
+            # Run in event loop
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(dp.feed_update(bot, update))
+            loop.close()
+            
+            logger.info("✅ Update processed successfully")
+            
+        except Exception as e:
+            logger.error(f"❌ Error processing update: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
