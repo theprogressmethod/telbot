@@ -401,8 +401,12 @@ class DatabaseManager:
 smart_analyzer = SmartAnalysis(config)
 
 # Initialize role manager
-from user_role_manager import UserRoleManager
+from simple_role_manager import SimpleRoleManager as UserRoleManager
+from user_analytics import UserAnalytics
+from leaderboard import Leaderboard
 role_manager = UserRoleManager(supabase)
+user_analytics = UserAnalytics(supabase)
+leaderboard = Leaderboard(supabase)
 
 # Temporary storage for callback data (use Redis in production)
 temp_storage = {}
@@ -1048,6 +1052,41 @@ async def help_handler(message: Message):
     
     await message.answer(help_text, parse_mode="Markdown")
 
+@dp.message(Command("stats"))
+async def stats_handler(message: Message):
+    """Show user's personal analytics and gamification stats"""
+    user_id = message.from_user.id
+    
+    # Ensure user exists
+    await role_manager.ensure_user_exists(
+        user_id, 
+        message.from_user.first_name,
+        message.from_user.username
+    )
+    
+    # Get and format analytics
+    stats_message = await user_analytics.format_stats_message(user_id)
+    
+    await message.answer(stats_message, parse_mode="Markdown")
+
+@dp.message(Command("leaderboard"))
+async def leaderboard_handler(message: Message):
+    """Show weekly leaderboard"""
+    weekly_message = await leaderboard.format_weekly_leaderboard_message()
+    await message.answer(weekly_message, parse_mode="Markdown")
+
+@dp.message(Command("champions"))
+async def champions_handler(message: Message):
+    """Show all-time champions"""
+    all_time_message = await leaderboard.format_all_time_leaderboard_message()
+    await message.answer(all_time_message, parse_mode="Markdown")
+
+@dp.message(Command("streaks"))
+async def streaks_handler(message: Message):
+    """Show streak leaders"""
+    streak_message = await leaderboard.format_streak_leaderboard_message()
+    await message.answer(streak_message, parse_mode="Markdown")
+
 @dp.message(Command("myroles"))
 async def myroles_handler(message: Message):
     """Show user's current roles"""
@@ -1084,8 +1123,8 @@ async def myroles_handler(message: Message):
     
     await message.answer(role_text, parse_mode="Markdown")
 
-@dp.message(Command("stats"))
-async def stats_handler(message: Message):
+@dp.message(Command("adminstats"))
+async def admin_stats_handler(message: Message):
     """Admin command to view platform statistics"""
     user_id = message.from_user.id
     
@@ -1213,6 +1252,8 @@ async def set_bot_commands():
         BotCommand(command="commit", description="Add a new commitment"),
         BotCommand(command="done", description="Mark commitments as complete"),
         BotCommand(command="list", description="View your active commitments"),
+        BotCommand(command="stats", description="View your progress & achievements"),
+        BotCommand(command="leaderboard", description="See this week's top performers"),
         BotCommand(command="feedback", description="Send feedback or suggestions"),
         BotCommand(command="help", description="Show help message"),
     ]
