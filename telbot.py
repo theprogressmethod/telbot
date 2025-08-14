@@ -403,9 +403,11 @@ smart_analyzer = SmartAnalysis(config)
 # Initialize role manager
 from simple_role_manager import SimpleRoleManager as UserRoleManager
 from user_analytics import UserAnalytics
+from dream_focused_analytics import DreamFocusedAnalytics
 from leaderboard import Leaderboard
 role_manager = UserRoleManager(supabase)
 user_analytics = UserAnalytics(supabase)
+dream_analytics = DreamFocusedAnalytics(supabase)
 leaderboard = Leaderboard(supabase)
 
 # Temporary storage for callback data (use Redis in production)
@@ -1052,6 +1054,23 @@ async def help_handler(message: Message):
     
     await message.answer(help_text, parse_mode="Markdown")
 
+@dp.message(Command("progress"))
+async def progress_handler(message: Message):
+    """Show meaningful progress toward dreams (not just points)"""
+    user_id = message.from_user.id
+    
+    # Ensure user exists
+    await role_manager.ensure_user_exists(
+        user_id, 
+        message.from_user.first_name,
+        message.from_user.username
+    )
+    
+    # Get and format dream-focused analytics
+    progress_message = await dream_analytics.format_meaningful_message(user_id)
+    
+    await message.answer(progress_message, parse_mode="Markdown")
+
 @dp.message(Command("stats"))
 async def stats_handler(message: Message):
     """Show user's personal analytics and gamification stats"""
@@ -1252,7 +1271,8 @@ async def set_bot_commands():
         BotCommand(command="commit", description="Add a new commitment"),
         BotCommand(command="done", description="Mark commitments as complete"),
         BotCommand(command="list", description="View your active commitments"),
-        BotCommand(command="stats", description="View your progress & achievements"),
+        BotCommand(command="progress", description="See your meaningful progress"),
+        BotCommand(command="stats", description="View points & achievements"),
         BotCommand(command="leaderboard", description="See this week's top performers"),
         BotCommand(command="feedback", description="Send feedback or suggestions"),
         BotCommand(command="help", description="Show help message"),
