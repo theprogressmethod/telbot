@@ -400,6 +400,10 @@ class DatabaseManager:
 # Initialize analysis engine with secure config
 smart_analyzer = SmartAnalysis(config)
 
+# Initialize role manager
+from user_role_manager import UserRoleManager
+role_manager = UserRoleManager(supabase)
+
 # Temporary storage for callback data (use Redis in production)
 temp_storage = {}
 
@@ -496,37 +500,75 @@ async def show_commitment_tips(chat_id: int):
 
 @dp.message(CommandStart())
 async def start_handler(message: Message):
-    """Handle /start command"""
+    """Handle /start command with first-time user detection"""
+    user_id = message.from_user.id
+    user_name = message.from_user.first_name or "there"
+    username = message.from_user.username
+    
+    # Ensure user exists in database and get role info
+    await role_manager.ensure_user_exists(user_id, user_name, username)
+    
+    # Check if first-time user
+    is_first_time = await role_manager.is_first_time_user(user_id)
+    user_roles = await role_manager.get_user_roles(user_id)
+    
     # Test database on first interaction
     db_test = await DatabaseManager.test_database()
     
-    user_name = message.from_user.first_name or "there"
-    
-    welcome_text = f"""Welcome {user_name}! 👋
+    if is_first_time:
+        # First-time user experience
+        welcome_text = f"""Welcome to The Progress Method, {user_name}! 🎯
 
-I'm your **Progress Method Accountability Bot** 🎯
+You've just joined a community of people who turn goals into reality.
 
-I'll help you turn goals into reality by:
-• Tracking your daily commitments 📝
-• Making them SMART with AI analysis 🧠
-• Celebrating your wins 🎉
+**What makes this different?**
+• AI-powered SMART goal analysis 🧠
+• Daily commitment tracking 📝
+• Optional accountability pods with real people 👥
 
-**Get Started:**
-👉 /commit - Add your first commitment
-Example: `/commit Read for 30 minutes today`
+**Let's start simple:**
+👉 Try: `/commit Read for 30 minutes today`
 
-**Other Commands:**
+I'll analyze it and help you make it even better! 
+
+**Want to join others?** 
+Check out our accountability pods at theprogressmethod.com 
+
+Ready to build better habits? 🚀"""
+    else:
+        # Returning user - personalized based on roles
+        has_pod = "pod_member" in user_roles
+        is_paid = "paid" in user_roles
+        
+        welcome_text = f"""Welcome back, {user_name}! 👋
+
+"""
+        
+        if has_pod:
+            welcome_text += "🎯 **Pod Member** - Keep that momentum going!\n\n"
+        elif is_paid:
+            welcome_text += "💎 **Paid Member** - Ready for your next breakthrough?\n\n"
+        else:
+            welcome_text += "Ready to continue building better habits? 💪\n\n"
+        
+        welcome_text += """**Quick Actions:**
+📝 /commit - Add today's commitment
+✅ /done - Mark commitments complete  
 📋 /list - View active commitments
-✅ /done - Mark commitments complete
 💬 /feedback - Send suggestions
-❓ /help - See all features
 
-Ready to build better habits? Let's go! 🚀"""
+"""
+        
+        if not has_pod and not is_paid:
+            welcome_text += "**Want accountability partners?** Join a pod at theprogressmethod.com 🚀"
     
     if not db_test:
         welcome_text += "\n\n⚠️ Note: Database connection issue detected. Some features may not work properly."
     
     await message.answer(welcome_text, parse_mode="Markdown")
+    
+    # Log user activity
+    logger.info(f"👋 {'New' if is_first_time else 'Returning'} user: {user_name} ({user_id}) - Roles: {user_roles}")
 
 @dp.message(Command("dbtest"))
 async def dbtest_handler(message: Message):
@@ -972,31 +1014,164 @@ async def feedback_handler(message: Message):
 
 @dp.message(Command("help"))
 async def help_handler(message: Message):
-    """Handle /help command"""
+    """Handle /help command with role-based features"""
+    user_id = message.from_user.id
+    roles = await role_manager.get_user_roles(user_id)
+    permissions = await role_manager.get_user_permissions(user_id)
+    
     help_text = """📚 *How to use this bot:*
 
-*Add a commitment:*
-/commit <your commitment>
-Example: /commit Read for 30 minutes
-
-*Mark as complete:*
-/done - Shows buttons for each commitment
-Click the button to mark it complete
-
-*View commitments:*
-/list - Shows all active commitments
-
-*Give feedback:*
-/feedback <your message> - Send feedback or suggestions
+*Basic Commands:*
+/commit <your commitment> - Add a commitment
+/done - Mark commitments complete  
+/list - View your active commitments
+/feedback <message> - Send feedback
 
 *Tips:*
 - Be specific with your commitments
 - Start small and build consistency
 - Check off completed items daily
 
-Questions? Use /feedback to reach us!"""
+"""
+    
+    # Add role-specific features
+    if permissions.get("can_join_pods"):
+        help_text += "*Pod Member Features:*\n/pods - View your pod info\n"
+        
+    if permissions.get("can_access_long_term_goals"):
+        help_text += "*Paid Features:*\n/goals - Manage long-term goals\n/insights - Get AI insights\n"
+    
+    if permissions.get("can_view_analytics"):
+        help_text += "*Admin Commands:*\n/stats - View platform statistics\n/grant_role - Grant role to user\n/users - Manage users\n"
+    
+    help_text += "\nQuestions? Use /feedback to reach us!"
     
     await message.answer(help_text, parse_mode="Markdown")
+
+@dp.message(Command("myroles"))
+async def myroles_handler(message: Message):
+    """Show user's current roles"""
+    user_id = message.from_user.id
+    roles = await role_manager.get_user_roles(user_id)
+    permissions = await role_manager.get_user_permissions(user_id)
+    
+    if not roles:
+        await message.answer("🔍 You don't have any roles assigned yet.")
+        return
+    
+    role_text = f"👤 **Your Current Roles:**\n\n"
+    
+    for role in sorted(roles):
+        role_emoji = {
+            'unpaid': '🆓',
+            'paid': '💎', 
+            'pod_member': '🎯',
+            'admin': '⚙️',
+            'super_admin': '👑',
+            'beta_tester': '🧪'
+        }.get(role, '📝')
+        
+        role_text += f"{role_emoji} {role.replace('_', ' ').title()}\n"
+    
+    # Show key permissions
+    key_perms = []
+    if permissions.get("can_join_pods"): key_perms.append("Pod Access")
+    if permissions.get("can_access_long_term_goals"): key_perms.append("Long-term Goals")
+    if permissions.get("can_view_analytics"): key_perms.append("Analytics")
+    
+    if key_perms:
+        role_text += f"\n**Available Features:** {', '.join(key_perms)}"
+    
+    await message.answer(role_text, parse_mode="Markdown")
+
+@dp.message(Command("stats"))
+async def stats_handler(message: Message):
+    """Admin command to view platform statistics"""
+    user_id = message.from_user.id
+    
+    if not await role_manager.user_has_any_role(user_id, ["admin", "super_admin"]):
+        await message.answer("⛔ Admin access required.")
+        return
+    
+    try:
+        # Get role statistics
+        role_stats = await role_manager.get_role_stats()
+        
+        # Get KPI data
+        kpi_queries = {
+            "new_users": "SELECT * FROM kpi_new_users",
+            "bot_usage": "SELECT * FROM kpi_bot_usage", 
+            "commitment_fulfillment": "SELECT * FROM kpi_commitment_fulfillment"
+        }
+        
+        stats_text = "📊 **Platform Statistics**\n\n"
+        
+        # Role breakdown
+        stats_text += f"👥 **User Roles:**\n"
+        stats_text += f"• Total Users: {role_stats.get('total_users', 0)}\n"
+        stats_text += f"• Unpaid: {role_stats.get('unpaid', 0)}\n"
+        stats_text += f"• Paid: {role_stats.get('paid', 0)}\n"
+        stats_text += f"• Pod Members: {role_stats.get('pod_member', 0)}\n"
+        stats_text += f"• Admins: {role_stats.get('admin', 0)}\n\n"
+        
+        # Get recent activity
+        for kpi_name, query in kpi_queries.items():
+            try:
+                result = supabase.rpc('execute_sql', {'query': query}).execute()
+                if result.data:
+                    kpi_data = result.data[0]
+                    
+                    if kpi_name == "new_users":
+                        stats_text += f"📈 **New Users:** {kpi_data.get('new_users_this_week', 0)} this week\n"
+                    elif kpi_name == "bot_usage":
+                        stats_text += f"🤖 **Bot Usage:** {kpi_data.get('weekly_active_percentage', 0):.1f}% active\n"
+                    elif kpi_name == "commitment_fulfillment":
+                        stats_text += f"✅ **Completion Rate:** {kpi_data.get('weekly_completion_rate', 0):.1f}%\n"
+            except:
+                pass
+        
+        await message.answer(stats_text, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Error in stats command: {e}")
+        await message.answer("❌ Error retrieving statistics.")
+
+@dp.message(Command("grant_role"))
+async def grant_role_handler(message: Message):
+    """Admin command to grant roles to users"""
+    user_id = message.from_user.id
+    
+    if not await role_manager.user_has_any_role(user_id, ["admin", "super_admin"]):
+        await message.answer("⛔ Admin access required.")
+        return
+    
+    # Parse command: /grant_role <user_id> <role>
+    parts = message.text.split()
+    if len(parts) != 3:
+        await message.answer("Usage: /grant_role <user_id> <role>\n\nAvailable roles: paid, pod_member, admin, beta_tester")
+        return
+    
+    try:
+        target_user_id = int(parts[1])
+        role = parts[2]
+        
+        valid_roles = ["paid", "pod_member", "admin", "beta_tester"]
+        if role not in valid_roles:
+            await message.answer(f"❌ Invalid role. Choose from: {', '.join(valid_roles)}")
+            return
+        
+        success = await role_manager.grant_role(target_user_id, role, granted_by_id=user_id)
+        
+        if success:
+            await message.answer(f"✅ Granted '{role}' role to user {target_user_id}")
+        else:
+            await message.answer("❌ Failed to grant role. Check user exists.")
+            
+    except ValueError:
+        await message.answer("❌ Invalid user ID. Must be a number.")
+    except Exception as e:
+        logger.error(f"Error in grant_role command: {e}")
+        await message.answer("❌ Error processing command.")
 
 @dp.message(Command("fix"))
 async def fix_loading_handler(message: Message):
