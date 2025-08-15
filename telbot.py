@@ -96,10 +96,16 @@ class Config:
     
     @property
     def supabase_url(self) -> str:
+        # Use development database if in development environment
+        if os.getenv("ENVIRONMENT") == "development":
+            return os.getenv("DEV_SUPABASE_URL", "").strip()
         return os.getenv("SUPABASE_URL", "").strip()
     
     @property
     def supabase_key(self) -> str:
+        # Use development database if in development environment
+        if os.getenv("ENVIRONMENT") == "development":
+            return os.getenv("DEV_SUPABASE_KEY", "").strip()
         return os.getenv("SUPABASE_KEY", "").strip()
     
     @property
@@ -297,8 +303,18 @@ class DatabaseManager:
                 logger.error("❌ Supabase client not available")
                 return False
             
+            # Get user UUID from telegram_user_id
+            user_result = supabase.table("users").select("id").eq("telegram_user_id", telegram_user_id).execute()
+            
+            if not user_result.data:
+                logger.error(f"❌ User not found for telegram_user_id: {telegram_user_id}")
+                return False
+                
+            user_uuid = user_result.data[0]["id"]
+            
             # Prepare data
             commitment_data = {
+                "user_id": user_uuid,
                 "telegram_user_id": telegram_user_id,
                 "commitment": commitment,
                 "original_commitment": original_commitment,
@@ -405,13 +421,43 @@ from simple_role_manager import SimpleRoleManager as UserRoleManager
 from user_analytics import UserAnalytics
 from dream_focused_analytics import DreamFocusedAnalytics
 from leaderboard import Leaderboard
+from pod_week_tracker import PodWeekTracker
+from attendance_adapter import AttendanceAdapter
+from nurture_sequences import NurtureSequences, SequenceType
+from enhanced_user_onboarding import EnhancedUserOnboarding
 role_manager = UserRoleManager(supabase)
 user_analytics = UserAnalytics(supabase)
 dream_analytics = DreamFocusedAnalytics(supabase)
 leaderboard = Leaderboard(supabase)
+pod_tracker = PodWeekTracker(supabase)
+meet_tracker = AttendanceAdapter(supabase)
+nurture_system = NurtureSequences(supabase)
+onboarding_system = EnhancedUserOnboarding(supabase)
 
 # Temporary storage for callback data (use Redis in production)
 temp_storage = {}
+
+# Helper function for nurture sequence triggers
+async def _trigger_commitment_sequences(telegram_user_id: int):
+    """Trigger appropriate nurture sequences after commitment creation"""
+    try:
+        # Get user UUID
+        user_result = supabase.table("users").select("id, total_commitments").eq("telegram_user_id", telegram_user_id).execute()
+        if not user_result.data:
+            return
+        
+        user_uuid = user_result.data[0]["id"]
+        total_commitments = user_result.data[0]["total_commitments"]
+        
+        # Trigger commitment follow-up sequence
+        await nurture_system.check_triggers(user_uuid, "commitment_created")
+        
+        # Check for milestone triggers
+        if total_commitments == 5:
+            await nurture_system.check_triggers(user_uuid, "5_commitments_completed")
+            
+    except Exception as e:
+        logger.error(f"Error triggering commitment sequences: {e}")
 
 # Loading experience functions
 async def create_loading_experience(message: Message, commitment_text: str) -> Message:
@@ -522,25 +568,8 @@ async def start_handler(message: Message):
     db_test = await DatabaseManager.test_database()
     
     if is_first_time:
-        # First-time user experience
-        welcome_text = f"""Welcome to The Progress Method, {user_name}! 🎯
-
-You've just joined a community of people who turn goals into reality.
-
-**What makes this different?**
-• AI-powered SMART goal analysis 🧠
-• Daily commitment tracking 📝
-• Optional accountability pods with real people 👥
-
-**Let's start simple:**
-👉 Try: `/commit Read for 30 minutes today`
-
-I'll analyze it and help you make it even better! 
-
-**Want to join others?** 
-Check out our accountability pods at theprogressmethod.com 
-
-Ready to build better habits? 🚀"""
+        # Enhanced first-time user experience with immediate data collection
+        welcome_text = await onboarding_system.handle_first_time_user(user_id, user_name, username)
     else:
         # Returning user - personalized based on roles
         has_pod = "pod_member" in user_roles
@@ -572,6 +601,13 @@ Ready to build better habits? 🚀"""
         welcome_text += "\n\n⚠️ Note: Database connection issue detected. Some features may not work properly."
     
     await message.answer(welcome_text, parse_mode="Markdown")
+    
+    # Trigger nurture sequence for first-time users
+    if is_first_time:
+        user_result = supabase.table("users").select("id").eq("telegram_user_id", user_id).execute()
+        if user_result.data:
+            user_uuid = user_result.data[0]["id"]
+            await nurture_system.check_triggers(user_uuid, "first_interaction")
     
     # Log user activity
     logger.info(f"👋 {'New' if is_first_time else 'Returning'} user: {user_name} ({user_id}) - Roles: {user_roles}")
@@ -664,6 +700,9 @@ async def commit_handler(message: Message):
             )
             
             if success:
+                # Trigger nurture sequences
+                await _trigger_commitment_sequences(user_id)
+                
                 # Replace the loading message with success
                 await loading_message.edit_text(
                     f"✅ Great commitment! (SMART Score: {analysis['score']}/10)\n\n"
@@ -728,6 +767,9 @@ async def commit_handler(message: Message):
         )
         
         if success:
+            # Trigger nurture sequences
+            await _trigger_commitment_sequences(user_id)
+            
             await asyncio.sleep(1)
             await loading_message.edit_text(
                 f"✅ Commitment saved! (Default Score: 6/10)\n\n"
@@ -916,6 +958,9 @@ async def save_smart_callback(callback: CallbackQuery):
     )
     
     if success:
+        # Trigger nurture sequences
+        await _trigger_commitment_sequences(user_id)
+        
         await callback.message.edit_text(
             f"✅ SMART commitment saved!\n\n"
             f"📝 \"{stored_data['smart']}\"\n\n"
@@ -948,6 +993,9 @@ async def save_original_callback(callback: CallbackQuery):
     )
     
     if success:
+        # Trigger nurture sequences
+        await _trigger_commitment_sequences(user_id)
+        
         await callback.message.edit_text(
             f"✅ Commitment saved!\n\n"
             f"📝 \"{stored_data['original']}\"\n\n"
@@ -1032,6 +1080,8 @@ async def help_handler(message: Message):
 /done - Mark commitments complete  
 /list - View your active commitments
 /feedback <message> - Send feedback
+/sequences - View guidance messages
+/stop_sequences - Turn off automated messages
 
 *Tips:*
 - Be specific with your commitments
@@ -1042,13 +1092,13 @@ async def help_handler(message: Message):
     
     # Add role-specific features
     if permissions.get("can_join_pods"):
-        help_text += "*Pod Member Features:*\n/pods - View your pod info\n"
+        help_text += "*Pod Member Features:*\n/pods - View your pod info\n/podweek - Current pod week progress\n/podleaderboard - Pod week leaderboard\n/attendance - Your meeting attendance\n/podattendance - Pod attendance stats\n"
         
     if permissions.get("can_access_long_term_goals"):
         help_text += "*Paid Features:*\n/goals - Manage long-term goals\n/insights - Get AI insights\n"
     
     if permissions.get("can_view_analytics"):
-        help_text += "*Admin Commands:*\n/stats - View platform statistics\n/grant_role - Grant role to user\n/users - Manage users\n"
+        help_text += "*Admin Commands:*\n/stats - View platform statistics\n/grant_role - Grant role to user\n/users - Manage users\n/markattendance - Record meeting attendance\n"
     
     help_text += "\nQuestions? Use /feedback to reach us!"
     
@@ -1105,6 +1155,182 @@ async def streaks_handler(message: Message):
     """Show streak leaders"""
     streak_message = await leaderboard.format_streak_leaderboard_message()
     await message.answer(streak_message, parse_mode="Markdown")
+
+@dp.message(Command("podweek"))
+async def pod_week_handler(message: Message):
+    """Show current pod week progress"""
+    user_id = message.from_user.id
+    
+    # Check if user is pod member
+    if not await role_manager.user_has_role(user_id, "pod_member"):
+        await message.answer("🎯 This feature is for pod members! Join a pod at theprogressmethod.com")
+        return
+    
+    # For now, we'll simulate pod_id - in production this would come from user's pod membership
+    # TODO: Get actual pod_id from user's pod membership
+    pod_id = "demo-pod-id"  # Placeholder
+    
+    summary = await pod_tracker.format_pod_week_summary(str(user_id), pod_id)
+    await message.answer(summary, parse_mode="Markdown")
+
+@dp.message(Command("podleaderboard"))
+async def pod_leaderboard_handler(message: Message):
+    """Show pod week leaderboard"""
+    user_id = message.from_user.id
+    
+    if not await role_manager.user_has_role(user_id, "pod_member"):
+        await message.answer("🎯 This feature is for pod members!")
+        return
+    
+    # TODO: Get actual pod_id from user's pod membership
+    pod_id = "demo-pod-id"  # Placeholder
+    
+    leaderboard_data = await pod_tracker.get_pod_week_leaderboard(pod_id)
+    
+    if not leaderboard_data:
+        await message.answer("📊 No pod activity this week yet! Be the first to make a commitment.")
+        return
+    
+    message_text = "🏆 **This Week's Pod Leaderboard**\n\n"
+    
+    for user_data in leaderboard_data:
+        message_text += f"{user_data['emoji']} **{user_data['rank']}. {user_data['user_name']}**\n"
+        message_text += f"   ✅ {user_data['completed_commitments']}/{user_data['total_commitments']} ({user_data['completion_rate']}%)\n"
+        message_text += f"   ⭐ Avg Quality: {user_data['avg_quality']}/10\n\n"
+    
+    message_text += "Keep up the great work, team! 💪"
+    
+    await message.answer(message_text, parse_mode="Markdown")
+
+@dp.message(Command("attendance"))
+async def attendance_handler(message: Message):
+    """Show pod meeting attendance stats"""
+    user_id = message.from_user.id
+    
+    if not await role_manager.user_has_role(user_id, "pod_member"):
+        await message.answer("🎯 This feature is for pod members!")
+        return
+    
+    # TODO: Get actual pod_id from user's pod membership
+    pod_id = "demo-pod-id"  # Placeholder
+    
+    # Get user's specific attendance data
+    user_result = supabase.table("users").select("id").eq("telegram_user_id", user_id).execute()
+    if not user_result.data:
+        await message.answer("❌ User not found in database.")
+        return
+    
+    user_uuid = user_result.data[0]["id"]
+    attendance_summary = await meet_tracker.format_attendance_summary(pod_id, user_uuid)
+    
+    await message.answer(attendance_summary, parse_mode="Markdown")
+
+@dp.message(Command("podattendance"))
+async def pod_attendance_handler(message: Message):
+    """Show full pod attendance leaderboard"""
+    user_id = message.from_user.id
+    
+    if not await role_manager.user_has_role(user_id, "pod_member"):
+        await message.answer("🎯 This feature is for pod members!")
+        return
+    
+    # TODO: Get actual pod_id from user's pod membership
+    pod_id = "demo-pod-id"  # Placeholder
+    
+    attendance_summary = await meet_tracker.format_attendance_summary(pod_id)
+    
+    await message.answer(attendance_summary, parse_mode="Markdown")
+
+@dp.message(Command("markattendance"))
+async def mark_attendance_handler(message: Message):
+    """Manually mark attendance for a meeting (admin feature)"""
+    user_id = message.from_user.id
+    
+    if not await role_manager.user_has_any_role(user_id, ["admin", "super_admin"]):
+        await message.answer("⛔ Admin access required.")
+        return
+    
+    # Parse command: /markattendance @username 2025-01-15 attended 45
+    parts = message.text.split()
+    if len(parts) < 4:
+        await message.answer("""
+📝 **Mark Attendance Usage:**
+`/markattendance @username YYYY-MM-DD attended [duration_minutes]`
+`/markattendance @username YYYY-MM-DD absent`
+
+Examples:
+• `/markattendance @john 2025-01-15 attended 45`
+• `/markattendance @sara 2025-01-15 absent`
+""", parse_mode="Markdown")
+        return
+    
+    username = parts[1].replace("@", "")
+    meeting_date = parts[2]
+    attendance_status = parts[3].lower()
+    duration = int(parts[4]) if len(parts) > 4 and parts[4].isdigit() else 60
+    
+    # Get target user
+    target_user = supabase.table("users").select("id").eq("username", username).execute()
+    if not target_user.data:
+        await message.answer(f"❌ User @{username} not found.")
+        return
+    
+    target_user_id = target_user.data[0]["id"]
+    
+    # TODO: Get actual pod_id
+    pod_id = "demo-pod-id"
+    
+    attended = attendance_status == "attended"
+    success = await meet_tracker.manually_record_attendance(pod_id, target_user_id, meeting_date, attended, duration)
+    
+    if success:
+        status_text = f"attended ({duration} min)" if attended else "absent"
+        await message.answer(f"✅ Marked @{username} as {status_text} for {meeting_date}")
+    else:
+        await message.answer("❌ Failed to record attendance.")
+
+@dp.message(Command("sequences"))
+async def sequences_handler(message: Message):
+    """Show user's active nurture sequences"""
+    user_id = message.from_user.id
+    
+    # Get user UUID
+    user_result = supabase.table("users").select("id").eq("telegram_user_id", user_id).execute()
+    if not user_result.data:
+        await message.answer("❌ User not found in database.")
+        return
+    
+    user_uuid = user_result.data[0]["id"]
+    sequence_status = await nurture_system.format_sequence_status(user_uuid)
+    
+    await message.answer(sequence_status, parse_mode="Markdown")
+
+@dp.message(Command("stop_sequences"))
+async def stop_sequences_handler(message: Message):
+    """Stop all active nurture sequences"""
+    user_id = message.from_user.id
+    
+    # Get user UUID
+    user_result = supabase.table("users").select("id").eq("telegram_user_id", user_id).execute()
+    if not user_result.data:
+        await message.answer("❌ User not found in database.")
+        return
+    
+    user_uuid = user_result.data[0]["id"]
+    
+    # Get active sequences
+    active_sequences = supabase.table("user_sequence_state").select("sequence_type").eq("user_id", user_uuid).eq("is_active", True).execute()
+    
+    stopped_count = 0
+    for seq in active_sequences.data:
+        success = await nurture_system.stop_sequence(user_uuid, seq["sequence_type"])
+        if success:
+            stopped_count += 1
+    
+    if stopped_count > 0:
+        await message.answer(f"✅ Stopped {stopped_count} nurture sequence{'s' if stopped_count != 1 else ''}.\n\n💡 You can still use all bot features manually!")
+    else:
+        await message.answer("📭 No active sequences to stop.")
 
 @dp.message(Command("myroles"))
 async def myroles_handler(message: Message):
@@ -1244,8 +1470,27 @@ async def fix_loading_handler(message: Message):
 
 @dp.message()
 async def handle_text_messages(message: Message):
-    """Handle all other text messages"""
+    """Handle all other text messages with enhanced onboarding"""
+    user_id = message.from_user.id
     text = message.text.lower()
+    
+    # First, check if user needs onboarding data
+    needs_onboarding = await onboarding_system.check_user_needs_onboarding_data(user_id)
+    
+    if needs_onboarding:
+        # Process as potential onboarding data
+        result = await onboarding_system.process_onboarding_data(user_id, message.text)
+        
+        if result["status"] == "completed":
+            await message.answer(result["message"], parse_mode="Markdown")
+            return
+        elif result["status"] == "need_more_info":
+            await message.answer(result["message"], parse_mode="Markdown")
+            return
+        elif result["status"] == "error":
+            await message.answer(result["message"])
+            return
+        # If status is "not_needed", continue with normal processing
     
     # Check if it looks like a commitment
     commitment_keywords = ["will", "going to", "commit", "promise", "plan to", "intend to"]
@@ -1257,6 +1502,15 @@ async def handle_text_messages(message: Message):
             f"Use: /commit {message.text}"
         )
     else:
+        # Check if we should trigger gentle data collection
+        should_collect = await onboarding_system.should_trigger_data_collection(user_id)
+        if should_collect:
+            data_request = await onboarding_system.create_gentle_data_request(user_id)
+            if data_request:
+                await message.answer(data_request, parse_mode="Markdown")
+                return
+        
+        # Default response
         await message.answer(
             "I didn't understand that. Try:\n\n"
             "/commit <your commitment> - Add a new commitment\n"
