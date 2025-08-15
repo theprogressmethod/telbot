@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Attendance Features</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .nav-links {
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .nav-links a {
+            color: #28a745;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+        }
+        
+        .nav-links a:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .test-sections {
+            display: grid;
+            gap: 2rem;
+        }
+        
+        .test-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .test-section h2 {
+            color: #28a745;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 0.5rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 5px;
+            display: none;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .data-display {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .analytics-card {
+            background: #f8f9fa;
+            border-left: 4px solid #28a745;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .metric {
+            text-align: center;
+            padding: 1rem;
+            background: white;
+            border-radius: 5px;
+        }
+        
+        .metric h4 {
+            font-size: 1.5rem;
+            color: #28a745;
+            margin-bottom: 0.5rem;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #28a745;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Test Attendance Features</h1>
+        <p>Interactive testing interface for all attendance system functionality</p>
+    </div>
+    
+    <div class="container">
+        <div class="nav-links">
+            <a href="/">🏠 Dashboard</a>
+            <a href="/test">🧪 Test Features</a>
+            <a href="/analytics">📊 Analytics</a>
+        </div>
+        
+        <div class="test-sections">
+            <!-- Pod Selection -->
+            <div class="test-section">
+                <h2>1. Select Pod for Testing</h2>
+                <div class="form-group">
+                    <label for="pod-select">Choose a Pod:</label>
+                    <select id="pod-select" onchange="loadPodMembers()">
+                        <option value="">Loading pods...</option>
+                    </select>
+                </div>
+                <div id="pod-info" class="data-display" style="display: none;"></div>
+            </div>
+            
+            <!-- Create Meeting -->
+            <div class="test-section">
+                <h2>2. Create Meetings</h2>
+                
+                <!-- Meeting Date and Title - First Row -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="meeting-date">Meeting Date:</label>
+                        <input type="date" id="meeting-date">
+                    </div>
+                    <div class="form-group">
+                        <label for="event-title">Event Title:</label>
+                        <input type="text" id="event-title" placeholder="e.g. Pod Meeting, Strategy Session">
+                    </div>
+                </div>
+                
+                <!-- Meeting Type Selection -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="meeting-type">Meeting Type:</label>
+                        <select id="meeting-type" onchange="toggleMeetingType()">
+                            <option value="single">Single Meeting</option>
+                            <option value="recurring">Recurring Schedule</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="meeting-time">Time:</label>
+                        <input type="time" id="meeting-time" value="19:00">
+                    </div>
+                </div>
+                
+                <!-- Common Fields -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="meeting-duration">Duration (minutes):</label>
+                        <input type="number" id="meeting-duration" value="60" min="15" max="180">
+                    </div>
+                    <div class="form-group">
+                        <label for="timezone">Timezone:</label>
+                        <select id="timezone">
+                            <option value="America/New_York" selected>Eastern Time</option>
+                            <option value="America/Chicago">Central Time</option>
+                            <option value="America/Denver">Mountain Time</option>
+                            <option value="America/Los_Angeles">Pacific Time</option>
+                            <option value="UTC">UTC</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Calendar Integration Toggle -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="create-calendar-event" checked>
+                            📅 Add to Google Calendar
+                        </label>
+                        <small style="display: block; color: #666; margin-top: 4px;">
+                            Creates calendar event with Google Meet link
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <!-- Empty div for layout -->
+                    </div>
+                </div>
+                
+                <!-- Single Meeting Fields -->
+                <div id="single-meeting-fields">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>&nbsp;</label>
+                            <button onclick="createMeeting()" class="btn">📅 Create Meeting</button>
+                        </div>
+                        <div class="form-group">
+                            <!-- Empty for layout -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recurring Meeting Fields -->
+                <div id="recurring-meeting-fields" style="display: none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="recurrence-type">Frequency:</label>
+                            <select id="recurrence-type">
+                                <option value="weekly">Weekly</option>
+                                <option value="biweekly">Every 2 Weeks</option>
+                                <option value="monthly">Monthly</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="meeting-weekday">Day of Week:</label>
+                            <select id="meeting-weekday">
+                                <option value="0">Monday</option>
+                                <option value="1">Tuesday</option>
+                                <option value="2" selected>Wednesday</option>
+                                <option value="3">Thursday</option>
+                                <option value="4">Friday</option>
+                                <option value="5">Saturday</option>
+                                <option value="6">Sunday</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="start-date">Start Date:</label>
+                            <input type="date" id="start-date">
+                        </div>
+                        <div class="form-group">
+                            <label>&nbsp;</label>
+                            <button onclick="createRecurringSchedule()" class="btn">🔄 Create Schedule</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Results -->
+                <div id="create-meeting-result" class="result"></div>
+                <div id="recurring-schedule-result" class="result"></div>
+                
+                <!-- Show existing schedules -->
+                <div id="existing-schedules" style="margin-top: 1rem; display: none;">
+                    <h4>📅 Active Recurring Schedules</h4>
+                    <div id="schedules-list"></div>
+                    <button onclick="generateMeetingsFromSchedules()" class="btn" style="margin-top: 1rem;">Generate Next 4 Weeks</button>
+                    <div id="generate-meetings-result" class="result"></div>
+                </div>
+            </div>
+            
+            <!-- Record Attendance -->
+            <div class="test-section">
+                <h2>3. Record Attendance</h2>
+                <div id="attendance-form" style="display: none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="meeting-select">Select Meeting:</label>
+                            <select id="meeting-select">
+                                <option value="">Choose a meeting...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="member-select">Select Member:</label>
+                            <select id="member-select">
+                                <option value="">Choose a member...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="attended">Attended:</label>
+                            <select id="attended">
+                                <option value="true">Yes - Attended</option>
+                                <option value="false">No - Absent</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="duration">Duration (minutes):</label>
+                            <input type="number" id="duration" value="60" min="0" max="120">
+                        </div>
+                    </div>
+                    <button onclick="recordAttendance()" class="btn">Record Attendance</button>
+                </div>
+                <div id="record-attendance-result" class="result"></div>
+            </div>
+            
+            <!-- View Analytics -->
+            <div class="test-section">
+                <h2>4. View Member Analytics</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="analytics-member">Select Member:</label>
+                        <select id="analytics-member">
+                            <option value="">Choose a member...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button onclick="loadAnalytics()" class="btn">Load Analytics</button>
+                    </div>
+                </div>
+                <div id="analytics-display"></div>
+            </div>
+            
+            <!-- Meeting History -->
+            <div class="test-section">
+                <h2>5. Meeting History</h2>
+                <button onclick="loadMeetingHistory()" class="btn">Load Meeting History</button>
+                <div id="meeting-history" class="data-display" style="display: none;"></div>
+            </div>
+            
+            <!-- System Test -->
+            <div class="test-section">
+                <h2>6. Run Complete System Test</h2>
+                <p>This will test all major functions automatically.</p>
+                <button onclick="runCompleteTest()" class="btn">Run Complete Test</button>
+                <div id="complete-test-result" class="result"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentPodId = null;
+        let podMembers = [];
+        let podMeetings = [];
+        
+        // Load pods when page loads
+        window.addEventListener('load', loadPods);
+        
+        function toggleMeetingType() {
+            const meetingType = document.getElementById('meeting-type').value;
+            const singleFields = document.getElementById('single-meeting-fields');
+            const recurringFields = document.getElementById('recurring-meeting-fields');
+            
+            if (meetingType === 'single') {
+                singleFields.style.display = 'block';
+                recurringFields.style.display = 'none';
+            } else {
+                singleFields.style.display = 'none';
+                recurringFields.style.display = 'block';
+            }
+        }
+        
+        async function loadPods() {
+            try {
+                const response = await fetch('/api/pods');
+                const data = await response.json();
+                
+                const select = document.getElementById('pod-select');
+                select.innerHTML = '<option value="">Select a pod...</option>';
+                
+                if (data.status === 'success') {
+                    data.pods.forEach(pod => {
+                        const option = document.createElement('option');
+                        option.value = pod.id;
+                        option.textContent = pod.name || `Pod ${pod.id.substring(0, 8)}...`;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load pods:', error);
+            }
+        }
+        
+        async function loadPodMembers() {
+            const podSelect = document.getElementById('pod-select');
+            currentPodId = podSelect.value;
+            
+            if (!currentPodId) return;
+            
+            try {
+                // Load members
+                const response = await fetch(`/api/pod/${currentPodId}/members`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    podMembers = data.members;
+                    
+                    // Update member selects
+                    updateMemberSelects();
+                    
+                    // Show pod info
+                    const podInfo = document.getElementById('pod-info');
+                    podInfo.textContent = JSON.stringify(data.members, null, 2);
+                    podInfo.style.display = 'block';
+                    
+                    // Show attendance form
+                    document.getElementById('attendance-form').style.display = 'block';
+                    
+                    // Load meetings for this pod
+                    loadPodMeetings();
+                    
+                    // Load recurring schedules for this pod
+                    loadPodSchedules();
+                }
+            } catch (error) {
+                console.error('Failed to load pod members:', error);
+            }
+        }
+        
+        function updateMemberSelects() {
+            const selects = ['member-select', 'analytics-member'];
+            
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                select.innerHTML = '<option value="">Choose a member...</option>';
+                
+                podMembers.forEach(member => {
+                    const option = document.createElement('option');
+                    option.value = member.user_id;
+                    option.textContent = member.name || member.email || `User ${member.user_id.substring(0, 8)}...`;
+                    select.appendChild(option);
+                });
+            });
+        }
+        
+        async function loadPodMeetings() {
+            if (!currentPodId) return;
+            
+            try {
+                const response = await fetch(`/api/pod/${currentPodId}/meetings`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    podMeetings = data.meetings;
+                    
+                    const select = document.getElementById('meeting-select');
+                    select.innerHTML = '<option value="">Choose a meeting...</option>';
+                    
+                    data.meetings.forEach(meeting => {
+                        const option = document.createElement('option');
+                        option.value = meeting.id;
+                        option.textContent = `${meeting.meeting_date} (${meeting.attendance_count}/${meeting.total_responses} attended)`;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load meetings:', error);
+            }
+        }
+        
+        async function createMeeting() {
+            if (!currentPodId) {
+                showResult('create-meeting-result', 'error', 'Please select a pod first');
+                return;
+            }
+            
+            const meetingDate = document.getElementById('meeting-date').value;
+            const eventTitle = document.getElementById('event-title').value;
+            const meetingTime = document.getElementById('meeting-time').value;
+            const duration = document.getElementById('meeting-duration').value;
+            const timezone = document.getElementById('timezone').value;
+            const createCalendarEvent = document.getElementById('create-calendar-event').checked;
+            
+            if (!meetingDate || !meetingTime) {
+                showResult('create-meeting-result', 'error', 'Please fill in meeting date and time');
+                return;
+            }
+            
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> Creating...';
+            
+            try {
+                const response = await fetch('/api/create-meeting', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        pod_id: currentPodId,
+                        meeting_date: meetingDate,
+                        event_title: eventTitle,
+                        meeting_time: meetingTime,
+                        duration_minutes: parseInt(duration),
+                        timezone: timezone,
+                        create_calendar_event: createCalendarEvent
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    let message = `✅ Meeting created successfully!`;
+                    if (eventTitle) {
+                        message += ` Title: "${eventTitle}".`;
+                    }
+                    if (data.meeting.calendar_link) {
+                        message += ` 📅 Calendar event created with Google Meet link.`;
+                    } else if (createCalendarEvent) {
+                        message += ` ⚠️ Meeting created but calendar event failed.`;
+                    }
+                    showResult('create-meeting-result', 'success', message);
+                    loadPodMeetings(); // Refresh meeting list
+                } else {
+                    showResult('create-meeting-result', 'error', data.message);
+                }
+            } catch (error) {
+                showResult('create-meeting-result', 'error', error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = '📅 Create Meeting';
+            }
+        }
+        
+        async function recordAttendance() {
+            const meetingId = document.getElementById('meeting-select').value;
+            const userId = document.getElementById('member-select').value;
+            const attended = document.getElementById('attended').value === 'true';
+            const duration = parseInt(document.getElementById('duration').value);
+            
+            if (!meetingId || !userId) {
+                showResult('record-attendance-result', 'error', 'Please select meeting and member');
+                return;
+            }
+            
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> Recording...';
+            
+            try {
+                const response = await fetch('/api/record-attendance', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        meeting_id: meetingId,
+                        user_id: userId,
+                        attended: attended,
+                        duration_minutes: duration
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    showResult('record-attendance-result', 'success', 'Attendance recorded successfully!');
+                    loadPodMeetings(); // Refresh meeting list to show updated counts
+                } else {
+                    showResult('record-attendance-result', 'error', data.message);
+                }
+            } catch (error) {
+                showResult('record-attendance-result', 'error', error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Record Attendance';
+            }
+        }
+        
+        async function loadAnalytics() {
+            const userId = document.getElementById('analytics-member').value;
+            
+            if (!userId || !currentPodId) {
+                alert('Please select a member and pod');
+                return;
+            }
+            
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> Loading...';
+            
+            try {
+                const response = await fetch(`/api/user/${userId}/analytics?pod_id=${currentPodId}`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayAnalytics(data.analytics);
+                } else {
+                    showResult('analytics-display', 'error', data.message);
+                }
+            } catch (error) {
+                document.getElementById('analytics-display').innerHTML = 
+                    `<div class="result error">Failed to load analytics: ${error.message}</div>`;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Load Analytics';
+            }
+        }
+        
+        function displayAnalytics(analytics) {
+            const display = document.getElementById('analytics-display');
+            
+            const html = `
+                <div class="analytics-card">
+                    <h3>📊 Member Analytics</h3>
+                    <div class="analytics-grid">
+                        <div class="metric">
+                            <h4>${analytics.attendance_rate}%</h4>
+                            <p>Attendance Rate</p>
+                        </div>
+                        <div class="metric">
+                            <h4>${analytics.meetings_attended}</h4>
+                            <p>Meetings Attended</p>
+                        </div>
+                        <div class="metric">
+                            <h4>${analytics.total_meetings}</h4>
+                            <p>Total Meetings</p>
+                        </div>
+                        <div class="metric">
+                            <h4>${analytics.current_streak}</h4>
+                            <p>Current Streak</p>
+                        </div>
+                    </div>
+                    <div style="margin-top: 1rem;">
+                        <p><strong>Pattern:</strong> ${analytics.attendance_pattern}</p>
+                        <p><strong>Engagement:</strong> ${analytics.engagement_level}</p>
+                        <p><strong>Average Duration:</strong> ${analytics.average_duration} minutes</p>
+                        <p><strong>Risk Flags:</strong> ${analytics.risk_flags.length} flags</p>
+                    </div>
+                </div>
+            `;
+            
+            display.innerHTML = html;
+        }
+        
+        async function loadMeetingHistory() {
+            if (!currentPodId) {
+                alert('Please select a pod first');
+                return;
+            }
+            
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> Loading...';
+            
+            try {
+                const response = await fetch(`/api/pod/${currentPodId}/meetings`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    const display = document.getElementById('meeting-history');
+                    display.textContent = JSON.stringify(data.meetings, null, 2);
+                    display.style.display = 'block';
+                } else {
+                    alert('Failed to load meeting history: ' + data.message);
+                }
+            } catch (error) {
+                alert('Failed to load meeting history: ' + error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Load Meeting History';
+            }
+        }
+        
+        async function runCompleteTest() {
+            const resultDiv = document.getElementById('complete-test-result');
+            const button = event.target;
+            
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> Running Tests...';
+            
+            let results = ['🧪 Running Complete System Test...'];
+            
+            try {
+                // Test 1: System Status
+                results.push('\\n1. Testing system status...');
+                const statusResponse = await fetch('/api/system-status');
+                const statusData = await statusResponse.json();
+                results.push(statusData.status === 'success' ? '✅ System status: OK' : '❌ System status: Failed');
+                
+                // Test 2: Load Pods
+                results.push('\\n2. Testing pod loading...');
+                const podsResponse = await fetch('/api/pods');
+                const podsData = await podsResponse.json();
+                results.push(podsData.status === 'success' ? `✅ Pods loaded: ${podsData.pods.length} found` : '❌ Pod loading: Failed');
+                
+                if (podsData.status === 'success' && podsData.pods.length > 0) {
+                    const testPod = podsData.pods[0];
+                    
+                    // Test 3: Load Members
+                    results.push('\\n3. Testing member loading...');
+                    const membersResponse = await fetch(`/api/pod/${testPod.id}/members`);
+                    const membersData = await membersResponse.json();
+                    results.push(membersData.status === 'success' ? `✅ Members loaded: ${membersData.members.length} found` : '❌ Member loading: Failed');
+                    
+                    // Test 4: Load Meetings
+                    results.push('\\n4. Testing meeting history...');
+                    const meetingsResponse = await fetch(`/api/pod/${testPod.id}/meetings`);
+                    const meetingsData = await meetingsResponse.json();
+                    results.push(meetingsData.status === 'success' ? `✅ Meetings loaded: ${meetingsData.meetings.length} found` : '❌ Meeting loading: Failed');
+                }
+                
+                results.push('\\n🎉 Complete test finished!');
+                showResult('complete-test-result', 'success', results.join('\\n'));
+                
+            } catch (error) {
+                results.push(`\\n❌ Test failed: ${error.message}`);
+                showResult('complete-test-result', 'error', results.join('\\n'));
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Run Complete Test';
+            }
+        }
+        
+        async function createRecurringSchedule() {
+            if (!currentPodId) {
+                showResult('recurring-schedule-result', 'error', 'Please select a pod first');
+                return;
+            }
+            
+            const recurrenceType = document.getElementById('recurrence-type').value;
+            const meetingDay = document.getElementById('meeting-weekday').value;
+            const meetingTime = document.getElementById('meeting-time').value;
+            const timezone = document.getElementById('timezone').value;
+            const duration = document.getElementById('meeting-duration').value;
+            const startDate = document.getElementById('start-date').value;
+            const createCalendarEvent = document.getElementById('create-calendar-event').checked;
+            
+            if (!meetingTime || !startDate) {
+                showResult('recurring-schedule-result', 'error', 'Please fill in all required fields');
+                return;
+            }
+            
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> Creating Schedule...';
+            
+            try {
+                const response = await fetch('/api/create-recurring-schedule', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        pod_id: currentPodId,
+                        recurrence_type: recurrenceType,
+                        meeting_day: parseInt(meetingDay),
+                        meeting_time: meetingTime,
+                        timezone: timezone,
+                        duration_minutes: parseInt(duration),
+                        start_date: startDate,
+                        create_calendar_event: createCalendarEvent
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    showResult('recurring-schedule-result', 'success', 
+                        `✅ Recurring schedule created! Next meeting: ${new Date(data.schedule.next_occurrence).toLocaleString()}`);
+                    loadPodSchedules(); // Refresh schedule list
+                } else {
+                    showResult('recurring-schedule-result', 'error', data.message);
+                }
+            } catch (error) {
+                showResult('recurring-schedule-result', 'error', error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Create Recurring Schedule';
+            }
+        }
+        
+        async function loadPodSchedules() {
+            if (!currentPodId) return;
+            
+            try {
+                const response = await fetch(`/api/pod/${currentPodId}/recurring-schedules`);
+                const data = await response.json();
+                
+                if (data.status === 'success' && data.schedules.length > 0) {
+                    document.getElementById('existing-schedules').style.display = 'block';
+                    
+                    let html = '';
+                    data.schedules.forEach(schedule => {
+                        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                        html += `
+                            <div style="background: #f8f9fa; padding: 1rem; margin: 0.5rem 0; border-radius: 5px; border-left: 4px solid #28a745;">
+                                <strong>${schedule.recurrence_type.charAt(0).toUpperCase() + schedule.recurrence_type.slice(1)}</strong> - 
+                                ${dayNames[schedule.meeting_day]} at ${schedule.meeting_time} 
+                                (${schedule.duration_minutes} min, ${schedule.timezone})
+                                <br><small>Next: ${new Date(schedule.next_occurrence).toLocaleString()}</small>
+                            </div>
+                        `;
+                    });
+                    
+                    document.getElementById('schedules-list').innerHTML = html;
+                }
+            } catch (error) {
+                console.error('Failed to load schedules:', error);
+            }
+        }
+        
+        async function generateMeetingsFromSchedules() {
+            if (!currentPodId) return;
+            
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> Generating Meetings...';
+            
+            try {
+                // Get all active schedules for the pod
+                const schedulesResponse = await fetch(`/api/pod/${currentPodId}/recurring-schedules`);
+                const schedulesData = await schedulesResponse.json();
+                
+                if (schedulesData.status === 'success' && schedulesData.schedules.length > 0) {
+                    let totalGenerated = 0;
+                    
+                    for (const schedule of schedulesData.schedules) {
+                        const response = await fetch('/api/generate-meetings-from-schedule', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                schedule_id: schedule.id,
+                                weeks_ahead: 4
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            totalGenerated += data.meetings_generated;
+                        }
+                    }
+                    
+                    showResult('generate-meetings-result', 'success', 
+                        `✅ Generated ${totalGenerated} meetings for the next 4 weeks!`);
+                    loadPodMeetings(); // Refresh meeting list
+                } else {
+                    showResult('generate-meetings-result', 'error', 'No active recurring schedules found');
+                }
+            } catch (error) {
+                showResult('generate-meetings-result', 'error', error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Generate Next 4 Weeks of Meetings';
+            }
+        }
+        
+        function showResult(elementId, type, message) {
+            const element = document.getElementById(elementId);
+            element.className = `result ${type}`;
+            element.textContent = message;
+            element.style.display = 'block';
+        }
+        
+        // Set default dates
+        document.getElementById('meeting-date').value = 
+            new Date(Date.now() + 24*60*60*1000).toISOString().split('T')[0];
+            
+        document.getElementById('start-date').value = 
+            new Date().toISOString().split('T')[0];
+    </script>
+</body>
+</html>

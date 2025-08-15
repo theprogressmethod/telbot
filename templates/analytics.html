@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #6f42c1 0%, #e83e8c 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .nav-links {
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .nav-links a {
+            color: #6f42c1;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+        }
+        
+        .nav-links a:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .analytics-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .analytics-card h3 {
+            color: #6f42c1;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 0.5rem;
+        }
+        
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .metric h4 {
+            font-size: 2rem;
+            color: #6f42c1;
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .chart-container h3 {
+            color: #6f42c1;
+            margin-bottom: 1rem;
+        }
+        
+        .controls {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .controls h3 {
+            color: #6f42c1;
+            margin-bottom: 1rem;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #6f42c1 0%, #e83e8c 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .member-card {
+            background: #f8f9fa;
+            border-left: 4px solid #6f42c1;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 5px;
+        }
+        
+        .engagement-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .engagement-high { background: #d4edda; color: #155724; }
+        .engagement-moderate { background: #fff3cd; color: #856404; }
+        .engagement-low { background: #f8d7da; color: #721c24; }
+        .engagement-critical { background: #d1ecf1; color: #0c5460; }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #6f42c1;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .canvas-container {
+            position: relative;
+            height: 400px;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Attendance Analytics</h1>
+        <p>Comprehensive insights into pod engagement and member behavior</p>
+    </div>
+    
+    <div class="container">
+        <div class="nav-links">
+            <a href="/">🏠 Dashboard</a>
+            <a href="/test">🧪 Test Features</a>
+            <a href="/analytics">📊 Analytics</a>
+        </div>
+        
+        <div class="controls">
+            <h3>🎯 Analytics Controls</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="analytics-pod">Select Pod:</label>
+                    <select id="analytics-pod" onchange="loadPodAnalytics()">
+                        <option value="">Loading pods...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button onclick="refreshAnalytics()" class="btn">Refresh Analytics</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Loading analytics data...</p>
+        </div>
+        
+        <div id="analytics-content" style="display: none;">
+            <!-- Key Metrics -->
+            <div class="metric-grid">
+                <div class="metric">
+                    <h4 id="total-members">-</h4>
+                    <p>Total Members</p>
+                </div>
+                <div class="metric">
+                    <h4 id="avg-attendance">-</h4>
+                    <p>Avg Attendance Rate</p>
+                </div>
+                <div class="metric">
+                    <h4 id="total-meetings">-</h4>
+                    <p>Total Meetings</p>
+                </div>
+                <div class="metric">
+                    <h4 id="engagement-score">-</h4>
+                    <p>Engagement Score</p>
+                </div>
+            </div>
+            
+            <!-- Charts -->
+            <div class="analytics-grid">
+                <div class="chart-container">
+                    <h3>📈 Attendance Trends</h3>
+                    <div class="canvas-container">
+                        <canvas id="attendanceChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <h3>👥 Engagement Distribution</h3>
+                    <div class="canvas-container">
+                        <canvas id="engagementChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>📊 Member Performance Overview</h3>
+                <div class="canvas-container">
+                    <canvas id="memberChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Member Details -->
+            <div class="analytics-card">
+                <h3>👤 Member Analysis</h3>
+                <div id="member-analysis"></div>
+            </div>
+            
+            <!-- Insights -->
+            <div class="analytics-card">
+                <h3>💡 Key Insights</h3>
+                <div id="insights-display"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentPodId = null;
+        let memberAnalytics = [];
+        let attendanceChart = null;
+        let engagementChart = null;
+        let memberChart = null;
+        
+        // Load pods when page loads
+        window.addEventListener('load', loadPods);
+        
+        async function loadPods() {
+            try {
+                const response = await fetch('/api/pods');
+                const data = await response.json();
+                
+                const select = document.getElementById('analytics-pod');
+                select.innerHTML = '<option value="">Select a pod...</option>';
+                
+                if (data.status === 'success') {
+                    data.pods.forEach(pod => {
+                        const option = document.createElement('option');
+                        option.value = pod.id;
+                        option.textContent = pod.name || `Pod ${pod.id.substring(0, 8)}...`;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load pods:', error);
+            }
+        }
+        
+        async function loadPodAnalytics() {
+            const podSelect = document.getElementById('analytics-pod');
+            currentPodId = podSelect.value;
+            
+            if (!currentPodId) return;
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('analytics-content').style.display = 'none';
+            
+            try {
+                // Load members and their analytics
+                const membersResponse = await fetch(`/api/pod/${currentPodId}/members`);
+                const membersData = await membersResponse.json();
+                
+                if (membersData.status === 'success') {
+                    const members = membersData.members;
+                    
+                    // Load analytics for each member
+                    memberAnalytics = [];
+                    for (const member of members) {
+                        try {
+                            const analyticsResponse = await fetch(`/api/user/${member.user_id}/analytics?pod_id=${currentPodId}`);
+                            const analyticsData = await analyticsResponse.json();
+                            
+                            if (analyticsData.status === 'success') {
+                                memberAnalytics.push({
+                                    ...member,
+                                    analytics: analyticsData.analytics
+                                });
+                            }
+                        } catch (error) {
+                            console.error(`Failed to load analytics for ${member.user_id}:`, error);
+                        }
+                    }
+                    
+                    // Update displays
+                    updateMetrics();
+                    updateCharts();
+                    updateMemberAnalysis();
+                    updateInsights();
+                    
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('analytics-content').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Failed to load pod analytics:', error);
+                document.getElementById('loading').innerHTML = 
+                    '<p style="color: red;">❌ Failed to load analytics: ' + error.message + '</p>';
+            }
+        }
+        
+        function updateMetrics() {
+            const totalMembers = memberAnalytics.length;
+            const avgAttendance = totalMembers > 0 ? 
+                memberAnalytics.reduce((sum, m) => sum + m.analytics.attendance_rate, 0) / totalMembers : 0;
+            const totalMeetings = totalMembers > 0 ? 
+                Math.max(...memberAnalytics.map(m => m.analytics.total_meetings)) : 0;
+            
+            // Calculate engagement score
+            const engagementScore = calculateEngagementScore();
+            
+            document.getElementById('total-members').textContent = totalMembers;
+            document.getElementById('avg-attendance').textContent = avgAttendance.toFixed(1) + '%';
+            document.getElementById('total-meetings').textContent = totalMeetings;
+            document.getElementById('engagement-score').textContent = engagementScore.toFixed(1);
+        }
+        
+        function calculateEngagementScore() {
+            if (memberAnalytics.length === 0) return 0;
+            
+            // Weighted score based on attendance rate, streaks, and engagement level
+            let totalScore = 0;
+            memberAnalytics.forEach(member => {
+                const a = member.analytics;
+                let score = a.attendance_rate * 0.6; // 60% weight on attendance
+                score += (a.current_streak / Math.max(a.total_meetings, 1)) * 20 * 0.3; // 30% weight on streaks
+                score += getEngagementWeight(a.engagement_level) * 0.1; // 10% weight on engagement level
+                totalScore += score;
+            });
+            
+            return totalScore / memberAnalytics.length;
+        }
+        
+        function getEngagementWeight(level) {
+            switch (level) {
+                case 'high': return 100;
+                case 'moderate': return 70;
+                case 'low': return 40;
+                case 'critical': return 10;
+                default: return 50;
+            }
+        }
+        
+        function updateCharts() {
+            // Attendance Trends Chart
+            updateAttendanceChart();
+            
+            // Engagement Distribution Chart
+            updateEngagementChart();
+            
+            // Member Performance Chart
+            updateMemberChart();
+        }
+        
+        function updateAttendanceChart() {
+            const ctx = document.getElementById('attendanceChart').getContext('2d');
+            
+            if (attendanceChart) {
+                attendanceChart.destroy();
+            }
+            
+            // Create sample trend data (in real app, this would be historical data)
+            const labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'];
+            const attendanceData = memberAnalytics.map(member => member.analytics.attendance_rate);
+            
+            attendanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Average Attendance Rate',
+                        data: generateTrendData(attendanceData),
+                        borderColor: '#6f42c1',
+                        backgroundColor: 'rgba(111, 66, 193, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateEngagementChart() {
+            const ctx = document.getElementById('engagementChart').getContext('2d');
+            
+            if (engagementChart) {
+                engagementChart.destroy();
+            }
+            
+            // Count engagement levels
+            const engagementCounts = {
+                high: 0,
+                moderate: 0,
+                low: 0,
+                critical: 0
+            };
+            
+            memberAnalytics.forEach(member => {
+                const level = member.analytics.engagement_level;
+                if (engagementCounts.hasOwnProperty(level)) {
+                    engagementCounts[level]++;
+                }
+            });
+            
+            engagementChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['High', 'Moderate', 'Low', 'Critical'],
+                    datasets: [{
+                        data: [
+                            engagementCounts.high,
+                            engagementCounts.moderate,
+                            engagementCounts.low,
+                            engagementCounts.critical
+                        ],
+                        backgroundColor: [
+                            '#28a745',
+                            '#ffc107',
+                            '#fd7e14',
+                            '#dc3545'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+        
+        function updateMemberChart() {
+            const ctx = document.getElementById('memberChart').getContext('2d');
+            
+            if (memberChart) {
+                memberChart.destroy();
+            }
+            
+            // Sort members by attendance rate
+            const sortedMembers = [...memberAnalytics].sort((a, b) => 
+                b.analytics.attendance_rate - a.analytics.attendance_rate);
+            
+            memberChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedMembers.map(m => m.name || `User ${m.user_id.substring(0, 8)}...`),
+                    datasets: [{
+                        label: 'Attendance Rate (%)',
+                        data: sortedMembers.map(m => m.analytics.attendance_rate),
+                        backgroundColor: sortedMembers.map(m => getBarColor(m.analytics.engagement_level))
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function getBarColor(engagementLevel) {
+            switch (engagementLevel) {
+                case 'high': return '#28a745';
+                case 'moderate': return '#ffc107';
+                case 'low': return '#fd7e14';
+                case 'critical': return '#dc3545';
+                default: return '#6c757d';
+            }
+        }
+        
+        function updateMemberAnalysis() {
+            const container = document.getElementById('member-analysis');
+            
+            let html = '';
+            memberAnalytics.forEach(member => {
+                const a = member.analytics;
+                html += `
+                    <div class="member-card">
+                        <h4>${member.name || 'Unknown'} 
+                            <span class="engagement-badge engagement-${a.engagement_level}">${a.engagement_level}</span>
+                        </h4>
+                        <p><strong>Attendance:</strong> ${a.attendance_rate}% (${a.meetings_attended}/${a.total_meetings} meetings)</p>
+                        <p><strong>Pattern:</strong> ${a.attendance_pattern} | <strong>Streak:</strong> ${a.current_streak} meetings</p>
+                        <p><strong>Average Duration:</strong> ${a.average_duration} minutes</p>
+                        ${a.risk_flags.length > 0 ? `<p><strong>⚠️ Risk Flags:</strong> ${a.risk_flags.length}</p>` : ''}
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html || '<p>No member data available.</p>';
+        }
+        
+        function updateInsights() {
+            const container = document.getElementById('insights-display');
+            
+            if (memberAnalytics.length === 0) {
+                container.innerHTML = '<p>No data available for insights.</p>';
+                return;
+            }
+            
+            const insights = generateInsights();
+            let html = '<ul>';
+            insights.forEach(insight => {
+                html += `<li>${insight}</li>`;
+            });
+            html += '</ul>';
+            
+            container.innerHTML = html;
+        }
+        
+        function generateInsights() {
+            const insights = [];
+            
+            // Attendance insights
+            const avgAttendance = memberAnalytics.reduce((sum, m) => sum + m.analytics.attendance_rate, 0) / memberAnalytics.length;
+            if (avgAttendance > 80) {
+                insights.push('🎉 Excellent pod engagement with ' + avgAttendance.toFixed(1) + '% average attendance!');
+            } else if (avgAttendance < 60) {
+                insights.push('⚠️ Pod attendance needs attention - consider engagement strategies.');
+            }
+            
+            // Engagement level insights
+            const highEngagement = memberAnalytics.filter(m => m.analytics.engagement_level === 'high').length;
+            const lowEngagement = memberAnalytics.filter(m => m.analytics.engagement_level === 'low').length;
+            const criticalEngagement = memberAnalytics.filter(m => m.analytics.engagement_level === 'critical').length;
+            
+            if (highEngagement > memberAnalytics.length * 0.5) {
+                insights.push('💪 Strong pod performance - ' + highEngagement + ' members with high engagement!');
+            }
+            
+            if (criticalEngagement > 0) {
+                insights.push('🚨 ' + criticalEngagement + ' member(s) need immediate attention - consider personal outreach.');
+            }
+            
+            // Pattern insights
+            const perfectAttenders = memberAnalytics.filter(m => m.analytics.attendance_pattern === 'perfect_attender').length;
+            const ghostMembers = memberAnalytics.filter(m => m.analytics.attendance_pattern === 'ghost_member').length;
+            
+            if (perfectAttenders > 0) {
+                insights.push('⭐ ' + perfectAttenders + ' perfect attender(s) - celebrate their commitment!');
+            }
+            
+            if (ghostMembers > 0) {
+                insights.push('👻 ' + ghostMembers + ' ghost member(s) - consider re-engagement campaigns.');
+            }
+            
+            // Streak insights
+            const maxStreak = Math.max(...memberAnalytics.map(m => m.analytics.current_streak));
+            if (maxStreak >= 5) {
+                insights.push('🔥 Longest current streak: ' + maxStreak + ' meetings - recognize this achievement!');
+            }
+            
+            return insights.length > 0 ? insights : ['📊 More data needed to generate meaningful insights.'];
+        }
+        
+        function generateTrendData(attendanceData) {
+            // Generate sample trend data - in real app, use historical data
+            const avg = attendanceData.reduce((sum, val) => sum + val, 0) / attendanceData.length;
+            return [
+                avg - 10 + Math.random() * 10,
+                avg - 5 + Math.random() * 10,
+                avg + Math.random() * 10,
+                avg + 5 + Math.random() * 10,
+                avg + Math.random() * 10,
+                avg + 2 + Math.random() * 5
+            ];
+        }
+        
+        async function refreshAnalytics() {
+            if (currentPodId) {
+                await loadPodAnalytics();
+            }
+        }
+    </script>
+</body>
+</html>

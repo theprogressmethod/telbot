@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance System Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-card h3 {
+            font-size: 2rem;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-card p {
+            color: #666;
+            font-size: 1rem;
+        }
+        
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .action-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .action-card h3 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .navigation {
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .nav-links a {
+            color: #667eea;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+        }
+        
+        .nav-links a:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Attendance System Dashboard</h1>
+        <p>The Progress Method - Automated Pod Attendance Tracking</p>
+    </div>
+    
+    <div class="container">
+        <div class="navigation">
+            <div class="nav-links">
+                <a href="/">🏠 Dashboard</a>
+                <a href="/test">🧪 Test Features</a>
+                <a href="/analytics">📊 Analytics</a>
+                <a href="#" onclick="refreshSystemStatus()">🔄 Refresh Status</a>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Loading system status...</p>
+        </div>
+        
+        <div id="content" style="display: none;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3 id="pod-count">-</h3>
+                    <p>Active Pods</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="meeting-count">-</h3>
+                    <p>Recent Meetings</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="db-status">-</h3>
+                    <p>Database Status</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="last-updated">-</h3>
+                    <p>Last Updated</p>
+                </div>
+            </div>
+            
+            <div class="actions">
+                <div class="action-card">
+                    <h3>🏃‍♂️ Quick Actions</h3>
+                    <p style="margin-bottom: 1rem;">Common tasks for pod management</p>
+                    <a href="/test" class="btn">Test All Features</a>
+                    <a href="/analytics" class="btn btn-secondary">View Analytics</a>
+                </div>
+                
+                <div class="action-card">
+                    <h3>📊 System Health</h3>
+                    <p style="margin-bottom: 1rem;">Monitor system performance and connectivity</p>
+                    <button onclick="runSystemTest()" class="btn">Run System Test</button>
+                    <button onclick="refreshSystemStatus()" class="btn btn-secondary">Refresh Status</button>
+                </div>
+                
+                <div class="action-card">
+                    <h3>🔧 Developer Tools</h3>
+                    <p style="margin-bottom: 1rem;">Tools for testing and development</p>
+                    <button onclick="viewSystemLogs()" class="btn">View Logs</button>
+                    <button onclick="exportData()" class="btn btn-secondary">Export Data</button>
+                </div>
+            </div>
+            
+            <div id="system-test-results" style="display: none;" class="action-card">
+                <h3>🧪 System Test Results</h3>
+                <div id="test-output"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        async function loadSystemStatus() {
+            try {
+                const response = await fetch('/api/system-status');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    document.getElementById('pod-count').textContent = data.pod_count;
+                    document.getElementById('meeting-count').textContent = data.recent_meetings;
+                    document.getElementById('db-status').innerHTML = data.database;
+                    
+                    const lastUpdated = new Date(data.timestamp).toLocaleTimeString();
+                    document.getElementById('last-updated').textContent = lastUpdated;
+                    
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('content').style.display = 'block';
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                document.getElementById('loading').innerHTML = 
+                    '<p style="color: red;">❌ Failed to load system status: ' + error.message + '</p>';
+            }
+        }
+        
+        async function refreshSystemStatus() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('content').style.display = 'none';
+            await loadSystemStatus();
+        }
+        
+        async function runSystemTest() {
+            const testResults = document.getElementById('system-test-results');
+            const testOutput = document.getElementById('test-output');
+            
+            testOutput.innerHTML = '<div class="spinner"></div><p>Running system tests...</p>';
+            testResults.style.display = 'block';
+            
+            try {
+                // Test database connection
+                const statusResponse = await fetch('/api/system-status');
+                const statusData = await statusResponse.json();
+                
+                // Test getting pods
+                const podsResponse = await fetch('/api/pods');
+                const podsData = await podsResponse.json();
+                
+                let results = '<h4>✅ System Test Results:</h4><ul>';
+                results += `<li>Database Connection: ${statusData.status === 'success' ? '✅ Working' : '❌ Failed'}</li>`;
+                results += `<li>Pods API: ${podsData.status === 'success' ? '✅ Working' : '❌ Failed'}</li>`;
+                results += `<li>Pod Count: ${podsData.pods ? podsData.pods.length : 0} pods found</li>`;
+                results += `<li>Test Time: ${new Date().toLocaleString()}</li>`;
+                results += '</ul>';
+                
+                testOutput.innerHTML = results;
+            } catch (error) {
+                testOutput.innerHTML = '<p style="color: red;">❌ Test failed: ' + error.message + '</p>';
+            }
+        }
+        
+        function viewSystemLogs() {
+            alert('System logs would be displayed here. This feature connects to your server logs.');
+        }
+        
+        function exportData() {
+            alert('Data export functionality would be implemented here. This could export attendance data as CSV/JSON.');
+        }
+        
+        // Load system status when page loads
+        window.addEventListener('load', loadSystemStatus);
+        
+        // Auto-refresh every 30 seconds
+        setInterval(refreshSystemStatus, 30000);
+    </script>
+</body>
+</html>
