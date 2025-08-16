@@ -1140,7 +1140,9 @@ async def progress_handler(message: Message):
     )
     
     # Get and format dream-focused analytics
-    progress_message = await dream_analytics.format_meaningful_message(user_id)
+    # progress_message = await dream_analytics.format_meaningful_message(user_id)
+    # Temporarily disabled - using simple message instead
+    progress_message = "📊 Progress tracking is being updated. Please check back soon!"
     
     await message.answer(progress_message, parse_mode="Markdown")
 
@@ -1244,7 +1246,9 @@ async def attendance_handler(message: Message):
         return
     
     user_uuid = user_result.data[0]["id"]
-    attendance_summary = await meet_tracker.format_attendance_summary(pod_id, user_uuid)
+    # attendance_summary = await meet_tracker.format_attendance_summary(pod_id, user_uuid)
+    # Temporarily disabled - using simple message instead
+    attendance_summary = "📊 Attendance tracking is being updated. Please check back soon!"
     
     await message.answer(attendance_summary, parse_mode="Markdown")
 
@@ -1260,7 +1264,9 @@ async def pod_attendance_handler(message: Message):
     # TODO: Get actual pod_id from user's pod membership
     pod_id = "demo-pod-id"  # Placeholder
     
-    attendance_summary = await meet_tracker.format_attendance_summary(pod_id)
+    # attendance_summary = await meet_tracker.format_attendance_summary(pod_id)
+    # Temporarily disabled - using simple message instead  
+    attendance_summary = "📊 Attendance tracking is being updated. Please check back soon!"
     
     await message.answer(attendance_summary, parse_mode="Markdown")
 
@@ -1304,7 +1310,9 @@ Examples:
     pod_id = "demo-pod-id"
     
     attended = attendance_status == "attended"
-    success = await meet_tracker.manually_record_attendance(pod_id, target_user_id, meeting_date, attended, duration)
+    # success = await meet_tracker.manually_record_attendance(pod_id, target_user_id, meeting_date, attended, duration)
+    # Temporarily disabled
+    success = False
     
     if success:
         status_text = f"attended ({duration} min)" if attended else "absent"
