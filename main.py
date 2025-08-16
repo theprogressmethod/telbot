@@ -243,11 +243,35 @@ async def tally_webhook_handler(request: Request):
             if user_phone:
                 logger.info(f"📱 Phone: {user_phone}")
             
+            # Trigger n8n workflow for processing
+            try:
+                n8n_webhook_url = "https://n8n-digital-ocean.theprogressmethod.com/webhook/4b6076c8-7e51-4a64-9416-f5904996db63"
+                
+                # Send the original data to n8n in the format it expects
+                import httpx
+                async with httpx.AsyncClient() as client:
+                    n8n_response = await client.post(
+                        n8n_webhook_url,
+                        json=data,  # Send original Tally data
+                        headers={"Content-Type": "application/json"},
+                        timeout=10.0
+                    )
+                    
+                if n8n_response.status_code == 200:
+                    logger.info(f"✅ n8n workflow triggered successfully")
+                else:
+                    logger.warning(f"⚠️ n8n workflow trigger failed: {n8n_response.status_code}")
+                    
+            except Exception as e:
+                logger.error(f"❌ Failed to trigger n8n workflow: {e}")
+                # Don't fail the webhook if n8n is down
+            
             return {
                 "status": "success", 
                 "message": "Form submission received and stored",
                 "submission_id": submission_record['id'],
-                "form_name": form_name
+                "form_name": form_name,
+                "n8n_triggered": True
             }
         else:
             logger.error("❌ Failed to save form submission")
