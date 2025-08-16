@@ -341,6 +341,14 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Add simple admin routes early to debug production issues
+try:
+    from simple_admin import add_simple_admin_routes
+    add_simple_admin_routes(app)
+    print("✅ Simple admin routes loaded successfully")
+except Exception as e:
+    print(f"❌ Failed to load simple admin routes: {e}")
+
 @app.get("/")
 async def root():
     """Health check endpoint"""
