@@ -417,20 +417,20 @@ class DatabaseManager:
 smart_analyzer = SmartAnalysis(config)
 
 # Initialize role manager
-from simple_role_manager import SimpleRoleManager as UserRoleManager
+from user_role_manager import UserRoleManager
 from user_analytics import UserAnalytics
-from dream_focused_analytics import DreamFocusedAnalytics
+# from dream_focused_analytics import DreamFocusedAnalytics  # Temporarily disabled - missing module
 from leaderboard import Leaderboard
 from pod_week_tracker import PodWeekTracker
-from attendance_adapter import AttendanceAdapter
+# from attendance_adapter import AttendanceAdapter  # Temporarily disabled - missing module
 from nurture_sequences import NurtureSequences, SequenceType
 from enhanced_user_onboarding import EnhancedUserOnboarding
 role_manager = UserRoleManager(supabase)
 user_analytics = UserAnalytics(supabase)
-dream_analytics = DreamFocusedAnalytics(supabase)
+# dream_analytics = DreamFocusedAnalytics(supabase)  # Temporarily disabled
 leaderboard = Leaderboard(supabase)
 pod_tracker = PodWeekTracker(supabase)
-meet_tracker = AttendanceAdapter(supabase)
+# meet_tracker = AttendanceAdapter(supabase)  # Temporarily disabled
 nurture_system = NurtureSequences(supabase)
 onboarding_system = EnhancedUserOnboarding(supabase)
 
