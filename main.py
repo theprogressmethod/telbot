@@ -740,20 +740,14 @@ async def get_pods():
         
         pods = supabase.table("pods").select("*").order("created_at", desc=True).execute()
         
-        # Get member counts for each pod
+        # Simplified: skip member count for now to debug the issue
         pod_data = []
         for pod in pods.data:
-            pod_id = pod.get("id")
-            
-            # Get member count
-            members = supabase.table("pod_memberships").select("id", count="exact").eq("pod_id", pod_id).eq("is_active", True).execute()
-            member_count = members.count if members.count else 0
-            
             pod_data.append({
-                "id": pod_id,
+                "id": pod.get("id"),
                 "name": pod.get("name"),
                 "description": pod.get("description"),
-                "member_count": member_count,
+                "member_count": 0,  # Temporarily set to 0 to debug
                 "is_active": pod.get("status") == "active",
                 "created_at": pod.get("created_at")
             })
@@ -801,6 +795,32 @@ async def grant_user_role(telegram_user_id: int, role: str):
         return {"message": f"Role {role} granted to user {telegram_user_id}", "role_id": result.data[0]["id"]}
     except Exception as e:
         logger.error(f"Error granting role: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/pods/simple")
+async def get_pods_simple():
+    """Get simple pod list for debugging"""
+    try:
+        if not supabase:
+            raise HTTPException(status_code=503, detail="Database not connected")
+        
+        # Simple query with minimal processing
+        pods = supabase.table("pods").select("id, name, status, created_at").execute()
+        
+        return {
+            "total_count": len(pods.data),
+            "pods": [
+                {
+                    "id": pod["id"],
+                    "name": pod["name"], 
+                    "status": pod.get("status"),
+                    "is_active": pod.get("status") == "active"
+                }
+                for pod in pods.data
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error getting simple pods: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/api/pods")
