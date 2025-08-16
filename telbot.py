@@ -670,6 +670,13 @@ async def commit_handler(message: Message):
     
     logger.info(f"🎯 Processing commitment from user {user_id}: {commitment_text}")
     
+    # Ensure user exists in database
+    await role_manager.ensure_user_exists(
+        user_id, 
+        message.from_user.first_name,
+        message.from_user.username
+    )
+    
     # Test database before proceeding
     if not await DatabaseManager.test_database():
         await message.answer("❌ Database connection error. Please try again later or contact support.")
@@ -799,6 +806,14 @@ async def commit_handler(message: Message):
 async def list_handler(message: Message):
     """Handle /list command"""
     user_id = message.from_user.id
+    
+    # Ensure user exists in database
+    await role_manager.ensure_user_exists(
+        user_id, 
+        message.from_user.first_name,
+        message.from_user.username
+    )
+    
     commitments = await DatabaseManager.get_active_commitments(user_id)
     
     if not commitments:
@@ -827,6 +842,14 @@ async def list_handler(message: Message):
 async def done_handler(message: Message):
     """Handle /done command"""
     user_id = message.from_user.id
+    
+    # Ensure user exists in database
+    await role_manager.ensure_user_exists(
+        user_id, 
+        message.from_user.first_name,
+        message.from_user.username
+    )
+    
     commitments = await DatabaseManager.get_active_commitments(user_id)
     
     logger.info(f"🎯 /done command from user {user_id}, found {len(commitments)} commitments")
