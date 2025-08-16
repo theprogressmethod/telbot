@@ -423,6 +423,195 @@ async def simple_health():
     except:
         return JSONResponse(content={"status": "unhealthy"}, status_code=503)
 
+# ============= SIMPLE ADMIN ROUTES START =============
+# These are placed early in the file to ensure they load in production
+
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def simple_admin_dashboard():
+    """Simple admin dashboard that works in production"""
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Progress Method Admin Dashboard</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+            h1 { color: #333; }
+            .card { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            .metric { display: inline-block; margin: 20px; }
+            .metric-value { font-size: 2em; font-weight: bold; color: #4CAF50; }
+            .metric-label { color: #666; margin-top: 5px; }
+            button { background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+            button:hover { background: #45a049; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+            th { background: #f2f2f2; }
+        </style>
+    </head>
+    <body>
+        <h1>🚀 Progress Method Admin Dashboard</h1>
+        
+        <div class="card">
+            <h2>📊 System Overview</h2>
+            <div id="metrics">Loading metrics...</div>
+        </div>
+        
+        <div class="card">
+            <h2>👥 Users</h2>
+            <button onclick="loadUsers()">Refresh Users</button>
+            <div id="users">Loading users...</div>
+        </div>
+        
+        <div class="card">
+            <h2>📝 Recent Commitments</h2>
+            <button onclick="loadCommitments()">Refresh Commitments</button>
+            <div id="commitments">Loading commitments...</div>
+        </div>
+        
+        <script>
+            async function loadMetrics() {
+                try {
+                    const response = await fetch('/admin/api/simple-metrics');
+                    const data = await response.json();
+                    
+                    document.getElementById('metrics').innerHTML = `
+                        <div class="metric">
+                            <div class="metric-value">${data.total_users}</div>
+                            <div class="metric-label">Total Users</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${data.total_commitments}</div>
+                            <div class="metric-label">Total Commitments</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${data.active_commitments}</div>
+                            <div class="metric-label">Active Commitments</div>
+                        </div>
+                    `;
+                } catch (error) {
+                    document.getElementById('metrics').innerHTML = 'Error loading metrics: ' + error;
+                }
+            }
+            
+            async function loadUsers() {
+                try {
+                    const response = await fetch('/admin/api/simple-users');
+                    const data = await response.json();
+                    
+                    let html = '<table><tr><th>Name</th><th>Telegram ID</th><th>Commitments</th><th>Created</th></tr>';
+                    data.users.forEach(user => {
+                        html += `<tr>
+                            <td>${user.first_name || 'Unknown'}</td>
+                            <td>${user.telegram_user_id}</td>
+                            <td>${user.total_commitments || 0}</td>
+                            <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                    document.getElementById('users').innerHTML = html;
+                } catch (error) {
+                    document.getElementById('users').innerHTML = 'Error loading users: ' + error;
+                }
+            }
+            
+            async function loadCommitments() {
+                try {
+                    const response = await fetch('/admin/api/simple-commitments');
+                    const data = await response.json();
+                    
+                    let html = '<table><tr><th>User ID</th><th>Commitment</th><th>Status</th><th>Score</th><th>Created</th></tr>';
+                    data.commitments.forEach(c => {
+                        html += `<tr>
+                            <td>${c.telegram_user_id || c.user_id || 'Unknown'}</td>
+                            <td>${(c.commitment || '').substring(0, 50)}...</td>
+                            <td>${c.status}</td>
+                            <td>${c.smart_score || 0}</td>
+                            <td>${new Date(c.created_at).toLocaleDateString()}</td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                    document.getElementById('commitments').innerHTML = html;
+                } catch (error) {
+                    document.getElementById('commitments').innerHTML = 'Error loading commitments: ' + error;
+                }
+            }
+            
+            // Load all data on page load
+            loadMetrics();
+            loadUsers();
+            loadCommitments();
+            
+            // Refresh every 30 seconds
+            setInterval(() => {
+                loadMetrics();
+            }, 30000);
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+@app.get("/admin/api/simple-metrics")
+async def simple_metrics():
+    """Get simple system metrics"""
+    try:
+        from telbot import supabase
+        
+        if not supabase:
+            return {"error": "Database not connected"}
+        
+        # Get counts using simple queries
+        users = supabase.table("users").select("id", count="exact").execute()
+        total_users = users.count if users.count else 0
+        
+        commitments = supabase.table("commitments").select("id", count="exact").execute()
+        total_commitments = commitments.count if commitments.count else 0
+        
+        active_commitments = supabase.table("commitments").select("id", count="exact").eq("status", "active").execute()
+        active_count = active_commitments.count if active_commitments.count else 0
+        
+        return {
+            "total_users": total_users,
+            "total_commitments": total_commitments,
+            "active_commitments": active_count,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error in simple metrics: {e}")
+        return {"error": str(e)}
+
+@app.get("/admin/api/simple-users")
+async def simple_users():
+    """Get users list"""
+    try:
+        from telbot import supabase
+        
+        if not supabase:
+            return {"error": "Database not connected", "users": []}
+        
+        users = supabase.table("users").select("*").order("created_at", desc=True).limit(50).execute()
+        return {"users": users.data, "count": len(users.data)}
+    except Exception as e:
+        logger.error(f"Error getting users: {e}")
+        return {"error": str(e), "users": []}
+
+@app.get("/admin/api/simple-commitments")
+async def simple_commitments():
+    """Get recent commitments"""
+    try:
+        from telbot import supabase
+        
+        if not supabase:
+            return {"error": "Database not connected", "commitments": []}
+        
+        commitments = supabase.table("commitments").select("*").order("created_at", desc=True).limit(50).execute()
+        return {"commitments": commitments.data, "count": len(commitments.data)}
+    except Exception as e:
+        logger.error(f"Error getting commitments: {e}")
+        return {"error": str(e), "commitments": []}
+
+# ============= SIMPLE ADMIN ROUTES END =============
+
 @app.post("/webhook")
 async def webhook_handler(request: Request):
     """Handle incoming webhooks from Telegram"""
