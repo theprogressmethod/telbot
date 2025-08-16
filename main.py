@@ -564,6 +564,12 @@ async def admin_status():
         }
     }
 
+# Ultra-simple admin route with no dependencies at all
+@app.get("/admin/ping")
+async def admin_ping():
+    """Ultra simple admin ping"""
+    return {"ping": "pong", "timestamp": datetime.now().isoformat()}
+
 # Admin dashboard routes
 @app.get("/admin/dashboard", response_class=HTMLResponse, dependencies=[Depends(verify_admin)])
 async def admin_dashboard():
