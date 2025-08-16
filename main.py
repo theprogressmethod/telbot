@@ -669,7 +669,7 @@ async def get_metrics():
         active_count = active_commitments.count if active_commitments.count else 0
         
         # Get pod count
-        pods = supabase.table("pods").select("id", count="exact").eq("is_active", True).execute()
+        pods = supabase.table("pods").select("id", count="exact").eq("status", "active").execute()
         total_pods = pods.count if pods.count else 0
         
         return {
@@ -754,7 +754,7 @@ async def get_pods():
                 "name": pod.get("name"),
                 "description": pod.get("description"),
                 "member_count": member_count,
-                "is_active": pod.get("is_active"),
+                "is_active": pod.get("status") == "active",
                 "created_at": pod.get("created_at")
             })
         
@@ -817,13 +817,15 @@ async def create_pod(request: Request):
         if not name:
             raise HTTPException(status_code=400, detail="Pod name is required")
         
-        # Create pod
+        # Create pod with only fields that definitely exist
         pod_data = {
             "name": name,
-            "description": description,
-            "is_active": True,
-            "created_at": datetime.now().isoformat()
+            "status": "active"
         }
+        
+        # Only add description if provided and handle schema issues gracefully
+        if description:
+            pod_data["description"] = description
         
         result = supabase.table("pods").insert(pod_data).execute()
         
