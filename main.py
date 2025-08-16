@@ -32,7 +32,6 @@ from aiogram.types import Update
 # Import visibility and control systems
 from system_monitor_dashboard import SystemMonitor, create_dashboard_app
 from feature_control_system import FeatureControlSystem, Feature, FeatureFlag, RolloutStrategy
-from testing_optimization_framework import TestingFramework
 
 # Import Phase 2 enhancements
 from enhanced_metrics_system import EnhancedMetricsSystem
@@ -48,6 +47,21 @@ from auto_scaling_system import AutoScalingSystem
 from ml_insights_system import MLInsightsSystem
 from intelligent_anomaly_detection import IntelligentAnomalyDetection
 
+# Import Nurture Sequence Systems
+from nurture_sequence_dashboard import NurtureSequenceDashboard
+from pod_weekly_nurture import PodWeeklyNurture
+
+# Import Automated Attendance System (Adapted)
+from attendance_system_adapted import AttendanceSystemAdapted
+
+# Import Google Calendar Integration (alternative to Google Meet API)
+try:
+    from google_calendar_attendance import GoogleCalendarAttendance, create_pod_meeting_with_google_calendar
+    GOOGLE_CALENDAR_AVAILABLE = True
+except ImportError:
+    GOOGLE_CALENDAR_AVAILABLE = False
+    logger.warning("⚠️ Google Calendar integration dependencies not installed")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -60,7 +74,6 @@ config = None
 smart_analyzer = None
 monitor = None
 feature_system = None
-testing_framework = None
 
 # Phase 2 systems
 enhanced_metrics = None
@@ -75,6 +88,15 @@ predictive_analytics = None
 scaling_system = None
 ml_insights = None
 anomaly_detection = None
+# Nurture Sequence systems
+nurture_dashboard = None
+nurture_system = None
+
+# Attendance system
+attendance_system = None
+
+# Google Calendar integration
+google_calendar_integration = None
 
 # Admin authentication
 api_key_header = APIKeyHeader(name="X-Admin-Key", auto_error=False)
@@ -89,13 +111,9 @@ async def setup_visibility_systems(config, supabase):
     feature_system = FeatureControlSystem(supabase)
     await feature_system.initialize_feature_tables()
     
-    # Initialize testing framework
-    testing_framework = TestingFramework(supabase)
-    await testing_framework.initialize_testing_tables()
-    
-    return monitor, feature_system, testing_framework
+    return monitor, feature_system
 
-async def setup_phase2_systems(monitor, feature_system, testing_framework, supabase):
+async def setup_phase2_systems(monitor, feature_system, supabase):
     """Initialize Phase 2 enhanced systems"""
     
     # Initialize enhanced metrics
@@ -108,7 +126,7 @@ async def setup_phase2_systems(monitor, feature_system, testing_framework, supab
     stakeholder_dashboards = StakeholderDashboards(monitor, enhanced_metrics, alerting_system)
     
     # Initialize automated scheduler
-    automated_scheduler = AutomatedScheduler(monitor, enhanced_metrics, alerting_system, testing_framework)
+    automated_scheduler = AutomatedScheduler(monitor, enhanced_metrics, alerting_system, None)
     
     return enhanced_metrics, alerting_system, stakeholder_dashboards, automated_scheduler
 
@@ -134,6 +152,33 @@ async def setup_phase3_systems(monitor, enhanced_metrics, alerting_system, predi
     anomaly_detection = IntelligentAnomalyDetection(supabase, enhanced_metrics, alerting_system)
     
     return optimization_system, personalization_system, predictive_analytics, scaling_system, ml_insights, anomaly_detection
+
+async def setup_nurture_systems(supabase):
+    """Initialize nurture sequence systems"""
+    global nurture_dashboard, nurture_system, attendance_system, google_calendar_integration
+    
+    # Initialize core nurture system
+    nurture_system = PodWeeklyNurture(supabase)
+    
+    # Initialize comprehensive dashboard
+    nurture_dashboard = NurtureSequenceDashboard(supabase)
+    
+    # Initialize attendance system (adapted)
+    attendance_system = AttendanceSystemAdapted(supabase)
+    
+    # Initialize Google Calendar integration (optional)
+    if GOOGLE_CALENDAR_AVAILABLE:
+        try:
+            google_calendar_integration = GoogleCalendarAttendance()
+            await google_calendar_integration.initialize()
+            logger.info("✅ Google Calendar integration initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ Google Calendar integration failed to initialize: {e}")
+            google_calendar_integration = None
+    
+    logger.info("✅ Nurture sequence systems initialized")
+    logger.info("✅ Automated attendance system initialized")
+    return nurture_dashboard, nurture_system
 
 async def create_initial_features(feature_system):
     """Create initial feature flags for existing functionality"""
@@ -212,16 +257,20 @@ async def lifespan(app: FastAPI):
         
         # Initialize visibility and control systems
         from telbot import supabase  # Import supabase client from telbot
-        monitor, feature_system, testing_framework = await setup_visibility_systems(config, supabase)
+        monitor, feature_system = await setup_visibility_systems(config, supabase)
         logger.info("✅ Visibility and control systems initialized")
         
         # Initialize Phase 2 enhanced systems
-        enhanced_metrics, alerting_system, stakeholder_dashboards, automated_scheduler = await setup_phase2_systems(monitor, feature_system, testing_framework, supabase)
+        enhanced_metrics, alerting_system, stakeholder_dashboards, automated_scheduler = await setup_phase2_systems(monitor, feature_system, supabase)
         logger.info("✅ Phase 2 enhanced systems initialized")
         
         # Initialize Phase 3 intelligent systems
         optimization_system, personalization_system, predictive_analytics, scaling_system, ml_insights, anomaly_detection = await setup_phase3_systems(monitor, enhanced_metrics, alerting_system, None, supabase)
         logger.info("✅ Phase 3 intelligent systems initialized")
+        
+        # Initialize nurture sequence systems
+        nurture_dashboard, nurture_system = await setup_nurture_systems(supabase)
+        logger.info("✅ Nurture sequence systems initialized")
         
         # Create initial feature flags
         await create_initial_features(feature_system)
@@ -1149,6 +1198,484 @@ async def get_phase3_overview():
         return overview
     except Exception as e:
         logger.error(f"❌ Phase 3 overview error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Nurture Sequence Dashboard API Endpoints
+@app.get("/admin/api/nurture/overview", dependencies=[Depends(verify_admin)])
+async def get_nurture_overview():
+    """Get comprehensive nurture sequence system overview"""
+    try:
+        if not nurture_dashboard:
+            raise HTTPException(status_code=503, detail="Nurture dashboard not initialized")
+        
+        overview = await nurture_dashboard.get_comprehensive_overview()
+        return overview
+    except Exception as e:
+        logger.error(f"❌ Nurture overview error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/nurture/pods", dependencies=[Depends(verify_admin)])
+async def get_all_pod_statuses():
+    """Get detailed status for all pods with nurture sequences"""
+    try:
+        if not nurture_dashboard:
+            raise HTTPException(status_code=503, detail="Nurture dashboard not initialized")
+        
+        pod_statuses = await nurture_dashboard.get_all_pod_statuses()
+        return {
+            "total_pods": len(pod_statuses),
+            "pods": [
+                {
+                    "pod_id": pod.pod_id,
+                    "pod_name": pod.pod_name,
+                    "member_count": pod.member_count,
+                    "engagement_level": pod.engagement_level.value,
+                    "current_engagement": f"{pod.current_week_engagement:.1%}",
+                    "engagement_trend": pod.engagement_trend,
+                    "critical_issues_count": len(pod.critical_issues),
+                    "last_message_sent": pod.last_message_sent.isoformat() if pod.last_message_sent else None,
+                    "next_message_due": pod.next_message_due.isoformat() if pod.next_message_due else None
+                }
+                for pod in pod_statuses
+            ],
+            "last_updated": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Pod statuses error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/nurture/pods/{pod_id}", dependencies=[Depends(verify_admin)])
+async def get_pod_detailed_analytics(pod_id: str):
+    """Get detailed analytics for specific pod"""
+    try:
+        if not nurture_dashboard:
+            raise HTTPException(status_code=503, detail="Nurture dashboard not initialized")
+        
+        analytics = await nurture_dashboard.get_pod_detailed_analytics(pod_id)
+        return analytics
+    except Exception as e:
+        logger.error(f"❌ Pod analytics error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/nurture/insights", dependencies=[Depends(verify_admin)])
+async def get_nurture_insights():
+    """Get recent nurture system insights and recommendations"""
+    try:
+        if not nurture_dashboard:
+            raise HTTPException(status_code=503, detail="Nurture dashboard not initialized")
+        
+        insights = await nurture_dashboard.get_recent_insights()
+        return {
+            "total_insights": len(insights),
+            "critical_insights": len([i for i in insights if i.priority == "critical"]),
+            "high_priority_insights": len([i for i in insights if i.priority == "high"]),
+            "insights": [
+                {
+                    "insight_id": insight.insight_id,
+                    "type": insight.type,
+                    "priority": insight.priority,
+                    "title": insight.title,
+                    "description": insight.description,
+                    "recommended_actions": insight.recommended_actions,
+                    "pod_id": insight.pod_id,
+                    "created_at": insight.created_at.isoformat()
+                }
+                for insight in insights
+            ],
+            "last_updated": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Nurture insights error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/nurture/delivery-stats", dependencies=[Depends(verify_admin)])
+async def get_delivery_statistics():
+    """Get detailed message delivery and performance statistics"""
+    try:
+        if not nurture_dashboard:
+            raise HTTPException(status_code=503, detail="Nurture dashboard not initialized")
+        
+        stats = await nurture_dashboard.get_delivery_statistics()
+        return stats
+    except Exception as e:
+        logger.error(f"❌ Delivery stats error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/nurture/performance-trends", dependencies=[Depends(verify_admin)])
+async def get_performance_trends():
+    """Get system-wide performance trends"""
+    try:
+        if not nurture_dashboard:
+            raise HTTPException(status_code=503, detail="Nurture dashboard not initialized")
+        
+        trends = await nurture_dashboard.calculate_performance_trends()
+        return trends
+    except Exception as e:
+        logger.error(f"❌ Performance trends error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/api/nurture/schedule/{pod_id}", dependencies=[Depends(verify_admin)])
+async def schedule_weekly_sequences(pod_id: str):
+    """Schedule weekly nurture sequences for specific pod"""
+    try:
+        if not nurture_system:
+            raise HTTPException(status_code=503, detail="Nurture system not initialized")
+        
+        success = await nurture_system.schedule_weekly_sequences_for_pod(pod_id)
+        
+        if success:
+            return {
+                "status": "success",
+                "message": f"Weekly sequences scheduled for pod {pod_id}",
+                "pod_id": pod_id,
+                "scheduled_at": datetime.now().isoformat()
+            }
+        else:
+            raise HTTPException(status_code=400, detail="Failed to schedule sequences")
+    except Exception as e:
+        logger.error(f"❌ Schedule sequences error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/nurture/process-messages", dependencies=[Depends(verify_admin)])
+async def process_pending_messages():
+    """Process and return pending weekly nurture messages"""
+    try:
+        if not nurture_system:
+            raise HTTPException(status_code=503, detail="Nurture system not initialized")
+        
+        pending_messages = await nurture_system.process_weekly_messages()
+        
+        return {
+            "status": "success",
+            "pending_messages_count": len(pending_messages),
+            "messages": pending_messages,
+            "processed_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Process messages error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===== ATTENDANCE SYSTEM API ENDPOINTS =====
+
+@app.post("/admin/api/attendance/meetings", dependencies=[Depends(verify_admin)])
+async def create_pod_meeting(request: Request):
+    """Create a new pod meeting for attendance tracking"""
+    try:
+        if not attendance_system:
+            raise HTTPException(status_code=503, detail="Attendance system not initialized")
+        
+        data = await request.json()
+        
+        meeting = await attendance_system.create_pod_meeting(
+            pod_id=data["pod_id"],
+            meeting_date=data["meeting_date"],  # Format: "2025-08-15"
+            status=data.get("status", "scheduled")
+        )
+        
+        return {
+            "status": "success",
+            "meeting_id": meeting.id,
+            "pod_id": meeting.pod_id,
+            "meeting_date": meeting.meeting_date,
+            "meeting_status": meeting.status,
+            "created_at": meeting.created_at.isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Create pod meeting error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Note: Start/End meeting endpoints removed - using simplified pod meeting approach
+
+@app.post("/admin/api/attendance/records", dependencies=[Depends(verify_admin)])
+async def record_attendance(request: Request):
+    """Record attendance for a user at a meeting"""
+    try:
+        if not attendance_system:
+            raise HTTPException(status_code=503, detail="Attendance system not initialized")
+        
+        data = await request.json()
+        
+        record = await attendance_system.record_attendance(
+            meeting_id=data["meeting_id"],
+            user_id=data["user_id"],
+            attended=data.get("attended", True),
+            duration_minutes=data.get("duration_minutes", 60)
+        )
+        
+        return {
+            "status": "success",
+            "record_id": record.id,
+            "user_id": record.user_id,
+            "meeting_id": record.meeting_id,
+            "attended": record.attended,
+            "duration_minutes": record.duration_minutes,
+            "created_at": record.created_at.isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Record attendance error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/attendance/analytics/user/{user_id}/pod/{pod_id}", dependencies=[Depends(verify_admin)])
+async def get_user_attendance_analytics(user_id: str, pod_id: str, weeks_back: int = 12):
+    """Get comprehensive attendance analytics for a user"""
+    try:
+        if not attendance_system:
+            raise HTTPException(status_code=503, detail="Attendance system not initialized")
+        
+        analytics = await attendance_system.calculate_user_attendance_analytics(
+            user_id=user_id,
+            pod_id=pod_id,
+            weeks_back=weeks_back
+        )
+        
+        return {
+            "status": "success",
+            "user_id": analytics.user_id,
+            "pod_id": analytics.pod_id,
+            "total_scheduled_meetings": analytics.total_scheduled_meetings,
+            "meetings_attended": analytics.meetings_attended,
+            "meetings_missed": analytics.meetings_missed,
+            "attendance_rate": round(analytics.attendance_rate, 4),
+            "average_arrival_offset": round(analytics.average_arrival_offset, 2),
+            "average_duration_present": round(analytics.average_duration_present, 2),
+            "current_streak": analytics.current_streak,
+            "longest_streak": analytics.longest_streak,
+            "attendance_pattern": analytics.attendance_pattern.value,
+            "engagement_level": analytics.engagement_level.value,
+            "last_attendance_date": analytics.last_attendance_date.isoformat() if analytics.last_attendance_date else None,
+            "prediction_score": round(analytics.prediction_score, 4),
+            "risk_flags": analytics.risk_flags,
+            "calculated_at": analytics.calculated_at.isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Get user analytics error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/attendance/summary/pod/{pod_id}", dependencies=[Depends(verify_admin)])
+async def get_pod_attendance_summary(pod_id: str, weeks_back: int = 4):
+    """Get comprehensive attendance summary for a pod"""
+    try:
+        if not attendance_system:
+            raise HTTPException(status_code=503, detail="Attendance system not initialized")
+        
+        summary = await attendance_system.get_pod_attendance_summary(pod_id, weeks_back)
+        
+        if "error" in summary:
+            raise HTTPException(status_code=400, detail=summary["error"])
+        
+        return {
+            "status": "success",
+            **summary
+        }
+    except Exception as e:
+        logger.error(f"❌ Get pod summary error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/attendance/insights", dependencies=[Depends(verify_admin)])
+async def get_attendance_insights(pod_id: str = None, user_id: str = None):
+    """Generate AI-driven insights about attendance patterns"""
+    try:
+        if not attendance_system:
+            raise HTTPException(status_code=503, detail="Attendance system not initialized")
+        
+        insights = await attendance_system.generate_attendance_insights(pod_id=pod_id, user_id=user_id)
+        
+        return {
+            "status": "success",
+            "insights_count": len(insights),
+            "insights": [{
+                "insight_id": insight.insight_id,
+                "pod_id": insight.pod_id,
+                "user_id": insight.user_id,
+                "insight_type": insight.insight_type,
+                "priority": insight.priority,
+                "title": insight.title,
+                "description": insight.description,
+                "recommendation": insight.recommendation,
+                "confidence_score": round(insight.confidence_score, 4),
+                "created_at": insight.created_at.isoformat()
+            } for insight in insights],
+            "generated_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Get attendance insights error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/attendance/overview", dependencies=[Depends(verify_admin)])
+async def get_attendance_system_overview():
+    """Get comprehensive overview of the attendance system"""
+    try:
+        if not attendance_system:
+            raise HTTPException(status_code=503, detail="Attendance system not initialized")
+        
+        # Get system statistics
+        cache_entries = len(attendance_system.analytics_cache)
+        
+        # Get recent activity
+        from datetime import datetime, timedelta
+        cutoff = (datetime.now() - timedelta(days=30)).isoformat()
+        
+        try:
+            # Count recent meetings and attendance records
+            meetings_result = attendance_system.supabase.table("pod_meetings").select("id", count="exact").gte("created_at", cutoff).execute()
+            recent_meetings = meetings_result.count or 0
+            
+            attendance_result = attendance_system.supabase.table("meeting_attendance").select("id", count="exact").gte("created_at", cutoff).execute()
+            recent_attendance_records = attendance_result.count or 0
+        except:
+            recent_meetings = 0
+            recent_attendance_records = 0
+        
+        return {
+            "status": "success",
+            "system_status": "operational",
+            "analytics_cache_entries": cache_entries,
+            "cache_expiry_minutes": attendance_system.cache_expiry.total_seconds() / 60,
+            "recent_activity": {
+                "meetings_last_30_days": recent_meetings,
+                "attendance_records_last_30_days": recent_attendance_records
+            },
+            "system_capabilities": [
+                "pod_meeting_management",
+                "attendance_recording", 
+                "comprehensive_analytics",
+                "behavioral_pattern_analysis",
+                "predictive_scoring",
+                "ai_insights_generation",
+                "risk_flag_identification"
+            ],
+            "database_tables": [
+                "pod_meetings",
+                "meeting_attendance"
+            ],
+            "overview_generated_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Get attendance overview error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===== GOOGLE CALENDAR INTEGRATION ENDPOINTS =====
+
+@app.post("/admin/api/attendance/google-calendar/create-meeting", dependencies=[Depends(verify_admin)])
+async def create_meeting_with_google_calendar(request: Request):
+    """Create a pod meeting with integrated Google Calendar event and Meet link"""
+    try:
+        if not attendance_system:
+            raise HTTPException(status_code=503, detail="Attendance system not initialized")
+        
+        if not google_calendar_integration:
+            raise HTTPException(status_code=503, detail="Google Calendar integration not available")
+        
+        data = await request.json()
+        
+        result = await create_pod_meeting_with_google_calendar(
+            attendance_system=attendance_system,
+            calendar_integration=google_calendar_integration,
+            pod_id=data["pod_id"],
+            pod_name=data["pod_name"],
+            meeting_date=data["meeting_date"],
+            attendee_emails=data.get("attendee_emails", [])
+        )
+        
+        return {
+            "status": "success",
+            **result
+        }
+    except Exception as e:
+        logger.error(f"❌ Create Google Calendar meeting error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/attendance/google-calendar/attendance/{event_id}", dependencies=[Depends(verify_admin)])
+async def get_google_calendar_attendance(event_id: str):
+    """Get attendance data from Google Calendar event"""
+    try:
+        if not google_calendar_integration:
+            raise HTTPException(status_code=503, detail="Google Calendar integration not available")
+        
+        attendance_data = await google_calendar_integration.get_event_attendance(event_id)
+        
+        return {
+            "status": "success",
+            "event_id": event_id,
+            "participant_count": len(attendance_data),
+            "participants": attendance_data,
+            "retrieved_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Get Google Calendar attendance error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/api/attendance/google-calendar/sync/{event_id}/{meeting_id}", dependencies=[Depends(verify_admin)])
+async def sync_google_calendar_attendance(event_id: str, meeting_id: str):
+    """Sync Google Calendar attendance data to our attendance system"""
+    try:
+        if not attendance_system:
+            raise HTTPException(status_code=503, detail="Attendance system not initialized")
+        
+        if not google_calendar_integration:
+            raise HTTPException(status_code=503, detail="Google Calendar integration not available")
+        
+        sync_result = await google_calendar_integration.sync_calendar_attendance_to_system(
+            event_id=event_id,
+            meeting_id=meeting_id,
+            attendance_system=attendance_system
+        )
+        
+        if "error" in sync_result:
+            raise HTTPException(status_code=400, detail=sync_result["error"])
+        
+        return {
+            "status": "success",
+            **sync_result
+        }
+    except Exception as e:
+        logger.error(f"❌ Sync Google Calendar attendance error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/attendance/google-calendar/upcoming", dependencies=[Depends(verify_admin)])
+async def get_upcoming_pod_meetings():
+    """Get upcoming pod meetings from Google Calendar"""
+    try:
+        if not google_calendar_integration:
+            raise HTTPException(status_code=503, detail="Google Calendar integration not available")
+        
+        upcoming_meetings = await google_calendar_integration.get_upcoming_pod_meetings()
+        
+        return {
+            "status": "success",
+            "meetings_count": len(upcoming_meetings),
+            "meetings": upcoming_meetings,
+            "retrieved_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Get upcoming meetings error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/api/attendance/google-calendar/status", dependencies=[Depends(verify_admin)])
+async def get_google_calendar_integration_status():
+    """Get status of Google Calendar integration"""
+    try:
+        return {
+            "status": "success",
+            "google_calendar_available": GOOGLE_CALENDAR_AVAILABLE,
+            "integration_initialized": google_calendar_integration is not None,
+            "service_connected": google_calendar_integration.service is not None if google_calendar_integration else False,
+            "project_id": google_calendar_integration.project_id if google_calendar_integration else None,
+            "required_env_vars": {
+                "GOOGLE_CLOUD_PROJECT_ID": bool(os.getenv("GOOGLE_CLOUD_PROJECT_ID")),
+                "GOOGLE_MEET_SERVICE_ACCOUNT_FILE": bool(os.getenv("GOOGLE_MEET_SERVICE_ACCOUNT_FILE"))
+            },
+            "capabilities": [
+                "create_calendar_events",
+                "generate_meet_links",
+                "track_rsvp_responses",
+                "automatic_attendance_sync",
+                "upcoming_meetings_overview"
+            ] if google_calendar_integration else [],
+            "checked_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Get Google Calendar status error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
