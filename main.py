@@ -544,6 +544,12 @@ async def verify_admin(api_key: Optional[str] = Depends(api_key_header)):
     
     return True
 
+# Admin test route
+@app.get("/admin/test")
+async def admin_test():
+    """Simple admin test route"""
+    return {"status": "admin routes are working", "timestamp": datetime.now().isoformat()}
+
 # Admin dashboard routes
 @app.get("/admin/dashboard", response_class=HTMLResponse, dependencies=[Depends(verify_admin)])
 async def admin_dashboard():
