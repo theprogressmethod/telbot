@@ -33,26 +33,26 @@ from aiogram.types import Update
 from system_monitor_dashboard import SystemMonitor, create_dashboard_app
 from feature_control_system import FeatureControlSystem, Feature, FeatureFlag, RolloutStrategy
 
-# Import Phase 2 enhancements
-from enhanced_metrics_system import EnhancedMetricsSystem
-from alerting_system import AlertingSystem
-from stakeholder_dashboards import StakeholderDashboards, StakeholderType
-from automated_scheduler import AutomatedScheduler
+# Import Phase 2 enhancements - temporarily commented for production debugging
+# from enhanced_metrics_system import EnhancedMetricsSystem
+# from alerting_system import AlertingSystem
+# from stakeholder_dashboards import StakeholderDashboards, StakeholderType
+# from automated_scheduler import AutomatedScheduler
 
-# Import Phase 3 intelligent systems
-from intelligent_optimization_system import IntelligentOptimizationSystem
-from adaptive_personalization_system import AdaptivePersonalizationSystem
-from predictive_analytics_system import PredictiveAnalyticsSystem
-from auto_scaling_system import AutoScalingSystem
-from ml_insights_system import MLInsightsSystem
-from intelligent_anomaly_detection import IntelligentAnomalyDetection
+# Import Phase 3 intelligent systems - temporarily commented for production debugging
+# from intelligent_optimization_system import IntelligentOptimizationSystem
+# from adaptive_personalization_system import AdaptivePersonalizationSystem
+# from predictive_analytics_system import PredictiveAnalyticsSystem
+# from auto_scaling_system import AutoScalingSystem
+# from ml_insights_system import MLInsightsSystem
+# from intelligent_anomaly_detection import IntelligentAnomalyDetection
 
-# Import Nurture Sequence Systems
-from nurture_sequence_dashboard import NurtureSequenceDashboard
-from pod_weekly_nurture import PodWeeklyNurture
+# Import Nurture Sequence Systems - temporarily commented for production debugging
+# from nurture_sequence_dashboard import NurtureSequenceDashboard
+# from pod_weekly_nurture import PodWeeklyNurture
 
-# Import Automated Attendance System (Adapted)
-from attendance_system_adapted import AttendanceSystemAdapted
+# Import Automated Attendance System (Adapted) - temporarily commented for production debugging
+# from attendance_system_adapted import AttendanceSystemAdapted
 
 # Import Google Calendar Integration (alternative to Google Meet API)
 try:
