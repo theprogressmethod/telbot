@@ -550,6 +550,20 @@ async def admin_test():
     """Simple admin test route"""
     return {"status": "admin routes are working", "timestamp": datetime.now().isoformat()}
 
+# Simple admin status route without dependencies
+@app.get("/admin/status")
+async def admin_status():
+    """Simple admin status check"""
+    return {
+        "admin_system": "operational",
+        "timestamp": datetime.now().isoformat(),
+        "global_vars": {
+            "config": config is not None,
+            "monitor": monitor is not None,
+            "feature_system": feature_system is not None
+        }
+    }
+
 # Admin dashboard routes
 @app.get("/admin/dashboard", response_class=HTMLResponse, dependencies=[Depends(verify_admin)])
 async def admin_dashboard():
