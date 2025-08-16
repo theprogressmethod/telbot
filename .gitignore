@@ -1,6 +1,22 @@
 # Environment variables
 .env
 .env.local
+.env.production
+.env.dev
+*.env
+
+# CRITICAL: API Keys and Credentials - NEVER COMMIT THESE
+google-meet-service-account.json
+fenio.json
+*-service-account.json
+*-credentials.json
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+secrets.json
+config.json
 
 # Python
 __pycache__/
@@ -41,6 +57,38 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup and temporary files
+*.bak
+*.backup
+*_backup.*
+*.tmp
+*.temp
+
+# Test and development files (often contain sensitive data)
+test_*.py
+*_test.py
+debug_*.py
+*_debug.py
+setup_*.py
+migrate_*.py
+import_*.py
+*_import.py
+
+# Analysis and audit files
+*_AUDIT.md
+*_ANALYSIS.*
+*_RESULTS.*
+SECURITY_AUDIT_CRITICAL.md
+
+# Deployment configs (may contain tokens)
+railway.json
+render_deployment_config.yaml
 
 # Vercel
 .vercel
