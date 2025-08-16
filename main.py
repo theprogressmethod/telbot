@@ -165,6 +165,102 @@ async def webhook_info():
         raise HTTPException(status_code=500, detail=str(e))
 
 # ========================================
+# TALLY FORM WEBHOOK
+# ========================================
+
+@app.post("/webhook/tally")
+async def tally_webhook_handler(request: Request):
+    """Handle incoming webhooks from Tally forms"""
+    try:
+        logger.info("📝 Received Tally webhook")
+        
+        # Get the form data from Tally
+        data = await request.json()
+        logger.info(f"Tally data received: {json.dumps(data, indent=2)}")
+        
+        if not supabase:
+            logger.error("❌ Supabase not initialized")
+            raise HTTPException(status_code=500, detail="Database not available")
+        
+        # Extract form information
+        form_id = data.get("formId", "unknown")
+        form_name = data.get("formName", "Unknown Form")
+        submission_id = data.get("submissionId")
+        
+        # Extract form fields
+        fields = data.get("fields", {})
+        
+        # Map Tally fields to our database structure
+        user_name = None
+        user_email = None
+        user_phone = None
+        
+        # Extract common fields from Tally response
+        for field_id, field_data in fields.items():
+            field_type = field_data.get("type", "")
+            field_value = field_data.get("value")
+            field_label = field_data.get("label", "").lower()
+            
+            # Map fields based on type and label
+            if field_type == "INPUT_EMAIL" or "email" in field_label:
+                user_email = field_value
+            elif field_type == "INPUT_PHONE" or "phone" in field_label:
+                user_phone = field_value
+            elif field_type == "INPUT_TEXT" and ("name" in field_label or "call" in field_label):
+                user_name = field_value
+        
+        # Create form submission record
+        form_submission = {
+            "form_type": "tally_submission",
+            "form_data": {
+                "form_id": form_id,
+                "form_name": form_name,
+                "submission_id": submission_id,
+                "fields": fields,
+                "raw_data": data
+            },
+            "user_name": user_name,
+            "user_email": user_email,
+            "user_phone": user_phone,
+            "status": "pending",
+            "source": "tally_webhook",
+            "submitted_at": datetime.now().isoformat()
+        }
+        
+        # Insert into database
+        result = supabase.table("form_submissions").insert(form_submission).execute()
+        
+        if result.data:
+            submission_record = result.data[0]
+            logger.info(f"✅ Form submission saved with ID: {submission_record['id']}")
+            
+            # Log key details
+            logger.info(f"📊 Form: {form_name} ({form_id})")
+            if user_name:
+                logger.info(f"👤 User: {user_name}")
+            if user_email:
+                logger.info(f"📧 Email: {user_email}")
+            if user_phone:
+                logger.info(f"📱 Phone: {user_phone}")
+            
+            return {
+                "status": "success", 
+                "message": "Form submission received and stored",
+                "submission_id": submission_record['id'],
+                "form_name": form_name
+            }
+        else:
+            logger.error("❌ Failed to save form submission")
+            raise HTTPException(status_code=500, detail="Failed to save submission")
+            
+    except json.JSONDecodeError:
+        logger.error("❌ Invalid JSON in webhook payload")
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+    except Exception as e:
+        logger.error(f"❌ Tally webhook error: {e}")
+        raise HTTPException(status_code=500, detail=f"Webhook processing failed: {str(e)}")
+
+# ========================================
 # COMPREHENSIVE ADMIN DASHBOARD
 # ========================================
 
