@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 bot = None
 supabase = None
 smart_analyzer = None
+role_manager = None
 temp_storage = {}
 
 # Configuration Class
@@ -139,13 +140,23 @@ class DatabaseManager:
     
     @staticmethod
     async def save_commitment(telegram_user_id: int, commitment: str, original_commitment: str, smart_score: int) -> bool:
-        """Save commitment to database"""
+        """Save commitment to database with proper user_id linking"""
         try:
             if supabase is None:
                 logger.error("❌ Supabase client not available")
                 return False
             
+            # Get user UUID from telegram_user_id
+            user_result = supabase.table("users").select("id").eq("telegram_user_id", telegram_user_id).execute()
+            
+            if not user_result.data:
+                logger.error(f"❌ User not found for telegram_user_id: {telegram_user_id}")
+                return False
+                
+            user_uuid = user_result.data[0]["id"]
+            
             commitment_data = {
+                "user_id": user_uuid,
                 "telegram_user_id": telegram_user_id,
                 "commitment": commitment,
                 "original_commitment": original_commitment,
@@ -228,6 +239,14 @@ async def commit_handler(message: Message):
     commitment_text = command_parts[1].strip()
     user_id = message.from_user.id
     
+    # Ensure user exists in database
+    if role_manager:
+        await role_manager.ensure_user_exists(
+            user_id, 
+            message.from_user.first_name,
+            message.from_user.username
+        )
+    
     await message.answer("🤖 Analyzing your commitment...")
     
     try:
@@ -284,6 +303,13 @@ async def commit_handler(message: Message):
             
     except Exception as e:
         logger.error(f"❌ Error in commit handler: {e}")
+        # Ensure user exists before saving
+        if role_manager:
+            await role_manager.ensure_user_exists(
+                user_id, 
+                message.from_user.first_name,
+                message.from_user.username
+            )
         # Save anyway with default score
         await DatabaseManager.save_commitment(
             telegram_user_id=user_id,
@@ -384,6 +410,14 @@ async def save_smart_callback(callback: CallbackQuery):
         await callback.answer("Session expired. Please try again.")
         return
     
+    # Ensure user exists in database
+    if role_manager:
+        await role_manager.ensure_user_exists(
+            user_id, 
+            callback.from_user.first_name,
+            callback.from_user.username
+        )
+    
     success = await DatabaseManager.save_commitment(
         telegram_user_id=user_id,
         commitment=stored_data["smart"],
@@ -406,6 +440,14 @@ async def save_original_callback(callback: CallbackQuery):
         await callback.answer("Session expired. Please try again.")
         return
     
+    # Ensure user exists in database
+    if role_manager:
+        await role_manager.ensure_user_exists(
+            user_id, 
+            callback.from_user.first_name,
+            callback.from_user.username
+        )
+    
     success = await DatabaseManager.save_commitment(
         telegram_user_id=user_id,
         commitment=stored_data["original"],
@@ -421,7 +463,7 @@ async def save_original_callback(callback: CallbackQuery):
 
 def register_handlers(dp: Dispatcher):
     """Register all handlers with the dispatcher"""
-    global bot, supabase, smart_analyzer
+    global bot, supabase, smart_analyzer, role_manager
     
     try:
         # Initialize configuration
@@ -438,6 +480,12 @@ def register_handlers(dp: Dispatcher):
         except Exception as e:
             logger.error(f"❌ Database connection failed: {e}")
             supabase = None
+        
+        # Initialize role manager
+        if supabase:
+            from user_role_manager import UserRoleManager
+            role_manager = UserRoleManager(supabase)
+            logger.info("✅ Role manager initialized")
         
         # Initialize OpenAI
         openai.api_key = config.openai_api_key
