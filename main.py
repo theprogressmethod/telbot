@@ -252,6 +252,66 @@ async def webhook_info():
         logger.error(f"Webhook info error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/debug/commitment/{telegram_user_id}")
+async def debug_commitment_save(telegram_user_id: int):
+    """Debug endpoint to test commitment saving process"""
+    try:
+        if not supabase:
+            return {"error": "Supabase not initialized", "success": False}
+        
+        # Test 1: Check if user exists
+        user_result = supabase.table("users").select("id, telegram_user_id, first_name").eq("telegram_user_id", telegram_user_id).execute()
+        
+        user_exists = bool(user_result.data)
+        user_info = user_result.data[0] if user_result.data else None
+        
+        result = {
+            "telegram_user_id": telegram_user_id,
+            "user_exists": user_exists,
+            "user_info": user_info,
+            "database_connected": True,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # Test 2: If user exists, try to save a test commitment
+        if user_exists:
+            try:
+                user_uuid = user_info["id"]
+                test_commitment_data = {
+                    "user_id": user_uuid,
+                    "telegram_user_id": telegram_user_id,
+                    "commitment": "DEBUG TEST COMMITMENT - IGNORE",
+                    "original_commitment": "DEBUG TEST COMMITMENT - IGNORE",
+                    "status": "test",
+                    "smart_score": 1,
+                    "created_at": datetime.now().isoformat()
+                }
+                
+                # Try to insert test commitment
+                commit_result = supabase.table("commitments").insert(test_commitment_data).execute()
+                result["test_commitment_save"] = True
+                result["test_commitment_id"] = commit_result.data[0]["id"] if commit_result.data else None
+                
+                # Clean up test commitment
+                if result["test_commitment_id"]:
+                    supabase.table("commitments").delete().eq("id", result["test_commitment_id"]).execute()
+                    result["test_cleanup"] = True
+                    
+            except Exception as commit_error:
+                result["test_commitment_save"] = False
+                result["commitment_error"] = str(commit_error)
+                result["commitment_error_type"] = type(commit_error).__name__
+        
+        return result
+        
+    except Exception as e:
+        return {
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "success": False,
+            "timestamp": datetime.now().isoformat()
+        }
+
 # ========================================
 # TALLY FORM WEBHOOK
 # ========================================
