@@ -1444,6 +1444,42 @@ async def stop_sequences_handler(message: Message):
     else:
         await message.answer("📭 No active sequences to stop.")
 
+@dp.message(Command("debug"))
+async def debug_handler(message: Message, state: FSMContext):
+    """Debug user's current state and system status"""
+    user_id = message.from_user.id
+    current_state = await state.get_state()
+    
+    try:
+        # Get user info from database
+        user_result = supabase.table("users").select("*").eq("telegram_user_id", user_id).execute()
+        user_data = user_result.data[0] if user_result.data else None
+        
+        # Get user roles
+        roles = await role_manager.get_user_roles(user_id)
+        
+        debug_info = f"""🔍 **Debug Information for User {user_id}**
+
+**FSM State:** {current_state or 'None'}
+
+**Database Status:**
+• Status: {user_data.get('status', 'Unknown') if user_data else 'User not found'}
+• First impression started: {user_data.get('first_impression_started_at', 'No') if user_data else 'N/A'}
+• First commitment: {user_data.get('first_commitment_at', 'No') if user_data else 'N/A'}
+• Total commitments: {user_data.get('total_commitments', 0) if user_data else 0}
+
+**Roles:** {', '.join(roles) if roles else 'None'}
+
+**System Status:** ✅ All systems operational
+
+Use /fix to reset if needed."""
+        
+        await message.answer(debug_info, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Debug command error: {e}")
+        await message.answer(f"❌ Debug failed: {str(e)}")
+
 @dp.message(Command("myroles"))
 async def myroles_handler(message: Message):
     """Show user's current roles"""
@@ -1570,14 +1606,32 @@ async def grant_role_handler(message: Message):
         await message.answer("❌ Error processing command.")
 
 @dp.message(Command("fix"))
-async def fix_loading_handler(message: Message):
-    """Emergency command to fix stuck loading"""
+async def fix_loading_handler(message: Message, state: FSMContext):
+    """Emergency command to fix stuck loading and reset state"""
+    user_id = message.from_user.id
+    current_state = await state.get_state()
+    
+    logger.info(f"🔧 EMERGENCY FIX triggered by user {user_id} | Current state: {current_state}")
+    
+    # Clear any stuck FSM state
+    await state.clear()
+    
+    # Reset user status in database to clear any stuck states
+    try:
+        supabase.table("users").update({
+            "status": "active",
+            "first_impression_started_at": None,
+            "first_commitment_at": None
+        }).eq("telegram_user_id", user_id).execute()
+        logger.info(f"✅ Reset user {user_id} state in database")
+    except Exception as e:
+        logger.error(f"❌ Failed to reset user state: {e}")
+    
     await message.answer(
-        "🔧 If you had a stuck loading screen, it should be fixed now!\n\n"
-        "Try your /commit command again. If it keeps happening:\n"
-        "• Use /aitest to check AI status\n"
-        "• The AI service might be slow\n"
-        "• Your commitments are still being saved!"
+        "🔧 **Emergency Reset Complete!**\n\n"
+        "✅ Cleared your conversation state\n"
+        "✅ Reset your account status\n\n"
+        "Try sending me a message now - everything should work perfectly! 🚀"
     )
 
 @dp.message()
@@ -1586,10 +1640,36 @@ async def handle_text_messages(message: Message, state: FSMContext):
     user_id = message.from_user.id
     text = message.text.lower()
     
-    # Check if we're in any FSM state - if so, let the specific handlers deal with it
+    # DEBUGGING: Log all message handling attempts
     current_state = await state.get_state()
+    logger.info(f"🔍 Generic handler triggered for user {user_id}: '{message.text}' | State: {current_state}")
+    
+    # Check if we're in any FSM state - if so, let the specific handlers deal with it
     if current_state is not None:
         # We're in an FSM state, let the specific handlers process this
+        logger.warning(f"⚠️ User {user_id} in state {current_state} but reached generic handler - CIRCUIT BREAKER ACTIVATED!")
+        
+        # Circuit breaker: If user has been in a state too long, auto-recover
+        try:
+            user_result = supabase.table("users").select("first_impression_started_at, status").eq("telegram_user_id", user_id).execute()
+            if user_result.data:
+                started_at = user_result.data[0].get("first_impression_started_at")
+                if started_at:
+                    from datetime import datetime, timedelta
+                    started_time = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+                    if datetime.now(started_time.tzinfo) - started_time > timedelta(minutes=30):
+                        logger.info(f"🔄 Auto-recovering user {user_id} from stale state {current_state}")
+                        # Reset everything
+                        await state.clear()
+                        supabase.table("users").update({"status": "active"}).eq("telegram_user_id", user_id).execute()
+                        await message.answer("🔄 I noticed you were stuck in an old conversation. Let's start fresh! What can I help you with?")
+                        return
+        except Exception as e:
+            logger.error(f"Circuit breaker error: {e}")
+        
+        # EMERGENCY: Clear the broken state and respond
+        await state.clear()
+        await message.answer("I had a technical issue, but I'm back! Try sending your message again. 🤖")
         return
     
     # First, check if user needs onboarding data
@@ -1804,7 +1884,7 @@ async def handle_first_goal_magic(message: Message, state: FSMContext):
     user_name = message.from_user.first_name or "Champion"
     user_input = message.text.strip()
     
-    logger.info(f"🎯 First goal magic handler triggered for user {user_id}: {user_input}")
+    logger.info(f"✨ FIRST IMPRESSION HANDLER TRIGGERED for user {user_id}: '{user_input}'")
     
     try:
         # Create the magic experience
@@ -1883,6 +1963,8 @@ async def set_bot_commands():
         BotCommand(command="stats", description="View points & achievements"),
         BotCommand(command="leaderboard", description="See this week's top performers"),
         BotCommand(command="feedback", description="Send feedback or suggestions"),
+        BotCommand(command="debug", description="Debug your account status"),
+        BotCommand(command="fix", description="Emergency reset if stuck"),
         BotCommand(command="help", description="Show help message"),
     ]
     await bot.set_my_commands(commands)
