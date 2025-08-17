@@ -16,6 +16,13 @@ from dotenv import load_dotenv
 from supabase import create_client
 from essential_business_dashboard import add_business_metrics_routes
 from nurture_control_dashboard import add_nurture_control_routes
+# Load environment
+load_dotenv()
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 try:
     from webhook_monitoring import add_webhook_monitoring_routes, track_webhook_request
     monitoring_available = True
@@ -24,13 +31,6 @@ except ImportError as e:
     monitoring_available = False
     def track_webhook_request(success: bool):
         pass  # No-op if monitoring not available
-
-# Load environment
-load_dotenv()
-
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Initialize Supabase client
 SUPABASE_URL = os.getenv("SUPABASE_URL")

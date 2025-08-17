@@ -29,6 +29,16 @@ webhook_health_data = {
     "failed_requests": 0
 }
 
+def track_webhook_request(success: bool):
+    """Track webhook request statistics"""
+    webhook_health_data["total_requests"] += 1
+    if success:
+        webhook_health_data["successful_requests"] += 1
+        webhook_health_data["consecutive_failures"] = 0
+    else:
+        webhook_health_data["failed_requests"] += 1
+        webhook_health_data["consecutive_failures"] += 1
+
 async def check_telegram_health() -> Dict[str, Any]:
     """Check Telegram webhook health"""
     bot_token = os.getenv("PROD_BOT_TOKEN", "8418941418:AAEmmRYh0LpJU9xEx2buXBBSmQC9hse4BI0")
@@ -449,16 +459,3 @@ BOT_MONITOR.EXE v1.0 © 2025 // AUTO_CHECK: 30s // LAST_UPDATE: <span id="footer
         """
         
         return html
-    
-    # Track webhook requests
-    original_webhook_handler = None
-    
-    def track_webhook_request(success: bool):
-        """Track webhook request statistics"""
-        webhook_health_data["total_requests"] += 1
-        if success:
-            webhook_health_data["successful_requests"] += 1
-            webhook_health_data["consecutive_failures"] = 0
-        else:
-            webhook_health_data["failed_requests"] += 1
-            webhook_health_data["consecutive_failures"] += 1
