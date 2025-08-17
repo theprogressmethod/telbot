@@ -1824,7 +1824,8 @@ async def handle_bigger_goal_collection(message: Message, state: FSMContext):
         # Save the bigger goal
         supabase.table("users").update({
             "goal_90_days": bigger_goal,
-            "status": "first_impression_complete"
+            "status": "first_impression_complete",
+            "bigger_goal_collected_at": datetime.now().isoformat()
         }).eq("telegram_user_id", user_id).execute()
         
         await state.clear()

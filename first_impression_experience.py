@@ -245,7 +245,8 @@ Make it personal, inspiring, and believable. Avoid generic responses."""
                     "username": username,
                     "email": f"{telegram_user_id}@telegram.user",  # Temporary email
                     "status": "first_impression_flow",
-                    "created_at": datetime.now().isoformat()
+                    "created_at": datetime.now().isoformat(),
+                    "onboarding_started_at": datetime.now().isoformat()
                 }).execute()
                 
         except Exception as e:
@@ -255,7 +256,8 @@ Make it personal, inspiring, and believable. Avoid generic responses."""
         """Mark user as being in the magic experience flow"""
         try:
             self.supabase.table("users").update({
-                "status": "first_impression_magic"
+                "status": "first_impression_magic",
+                "first_impression_started_at": datetime.now().isoformat()
             }).eq("telegram_user_id", telegram_user_id).execute()
         except Exception as e:
             logger.error(f"Error marking magic flow: {e}")
@@ -265,6 +267,7 @@ Make it personal, inspiring, and believable. Avoid generic responses."""
         try:
             self.supabase.table("users").update({
                 "status": "first_commitment_created",
+                "first_commitment_at": datetime.now().isoformat(),
                 "total_commitments": 1
             }).eq("telegram_user_id", telegram_user_id).execute()
         except Exception as e:
@@ -274,7 +277,8 @@ Make it personal, inspiring, and believable. Avoid generic responses."""
         """Mark celebration as complete"""
         try:
             self.supabase.table("users").update({
-                "status": "first_impression_complete"
+                "status": "first_impression_complete",
+                "first_celebration_at": datetime.now().isoformat()
             }).eq("telegram_user_id", telegram_user_id).execute()
         except Exception as e:
             logger.error(f"Error marking celebration: {e}")
