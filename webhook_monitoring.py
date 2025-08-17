@@ -162,7 +162,44 @@ def add_webhook_monitoring_routes(app: FastAPI):
     @app.get("/bot/dashboard", response_class=HTMLResponse)
     async def bot_monitoring_dashboard():
         """Bot monitoring dashboard"""
-        from retro_styles import get_retro_css, get_retro_js
+        try:
+            from retro_styles import get_retro_css, get_retro_js
+        except ImportError:
+            # Fallback styles if retro_styles is not available
+            def get_retro_css():
+                return """
+                body { font-family: 'Courier New', monospace; background: #001122; color: #00ff88; margin: 0; padding: 20px; }
+                .terminal { background: linear-gradient(135deg, #ff006b 0%, #8338ec 25%, #3a86ff 50%, #06ffa5 75%, #ffbe0b 100%); 
+                           background-size: 400% 400%; animation: gradient 8s ease infinite; padding: 20px; border-radius: 10px; }
+                .screen { background: rgba(0, 17, 34, 0.9); padding: 20px; border-radius: 5px; }
+                .header h1 { color: #ff006b; font-size: 24px; margin: 0; text-align: center; }
+                .ascii-border { color: #3a86ff; font-size: 8px; text-align: center; margin: 10px 0; }
+                .status-bar { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #333; margin-bottom: 20px; }
+                .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 10px 0; }
+                .metric-card { padding: 10px; border: 1px solid #333; border-radius: 3px; text-align: center; }
+                .metric-card.good { border-color: #00ff88; color: #00ff88; }
+                .metric-card.warning { border-color: #ffbe0b; color: #ffbe0b; }
+                .metric-card.critical { border-color: #ff006b; color: #ff006b; }
+                .metric-value { font-size: 18px; font-weight: bold; }
+                .metric-label { font-size: 10px; opacity: 0.8; }
+                .data-section { margin: 20px 0; }
+                .data-header { color: #3a86ff; font-weight: bold; margin-bottom: 10px; }
+                .footer { text-align: center; margin-top: 30px; color: #666; font-size: 10px; }
+                .blink { animation: blink 1s infinite; }
+                .loading { color: #ffbe0b; text-align: center; }
+                @keyframes gradient { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+                @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+                """
+            def get_retro_js():
+                return """
+                function updateTime() {
+                    const now = new Date();
+                    document.getElementById('time').textContent = now.toLocaleTimeString();
+                    document.getElementById('footer-time').textContent = now.toLocaleTimeString();
+                }
+                setInterval(updateTime, 1000);
+                updateTime();
+                """
         
         html = f"""
 <!DOCTYPE html>
