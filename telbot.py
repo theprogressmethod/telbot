@@ -157,6 +157,7 @@ class OnboardingStates(StatesGroup):
     waiting_for_email = State()
     waiting_for_goal = State()
     waiting_for_accountability = State()
+    waiting_for_comprehensive_info = State()
 
 class SmartAnalysis:
     """SMART goal analysis class with secure configuration"""
@@ -573,7 +574,7 @@ async def show_commitment_tips(chat_id: int):
     await asyncio.sleep(2)
 
 @dp.message(CommandStart())
-async def start_handler(message: Message):
+async def start_handler(message: Message, state: FSMContext):
     """Handle /start command with first-time user detection"""
     user_id = message.from_user.id
     user_name = message.from_user.first_name or "there"
@@ -623,6 +624,10 @@ async def start_handler(message: Message):
         welcome_text += "\n\n⚠️ Note: Database connection issue detected. Some features may not work properly."
     
     await message.answer(welcome_text, parse_mode="Markdown")
+    
+    # Set FSM state for first-time users to handle comprehensive onboarding response
+    if is_first_time:
+        await state.set_state(OnboardingStates.waiting_for_comprehensive_info)
     
     # Trigger nurture sequence for first-time users
     if is_first_time:
@@ -1720,6 +1725,34 @@ async def handle_accountability_input(message: Message, state: FSMContext):
         await message.answer(
             "Please reply with just the number (1, 2, 3, or 4) for your preference! 😊"
         )
+
+@dp.message(OnboardingStates.waiting_for_comprehensive_info)
+async def handle_comprehensive_onboarding(message: Message, state: FSMContext):
+    """Handle comprehensive onboarding response (name, email, goal all at once)"""
+    user_id = message.from_user.id
+    user_input = message.text.strip()
+    
+    try:
+        # Process the comprehensive onboarding data
+        result = await onboarding_system.process_onboarding_data(user_id, user_input)
+        
+        await state.clear()
+        
+        if result["status"] == "completed":
+            await message.answer(result["message"], parse_mode="Markdown")
+        elif result["status"] == "need_more_info":
+            # Set state back to wait for more info
+            await state.set_state(OnboardingStates.waiting_for_comprehensive_info)
+            await message.answer(result["message"], parse_mode="Markdown")
+        elif result["status"] == "not_needed":
+            await message.answer("You're already all set up! 🎉")
+        else:
+            await message.answer("Sorry, something went wrong. Let's try again!")
+            
+    except Exception as e:
+        logger.error(f"Error handling comprehensive onboarding: {e}")
+        await state.clear()
+        await message.answer("Sorry, there was an error processing your information. Please try again!")
 
 async def set_bot_commands():
     """Set bot commands for the menu"""
