@@ -117,6 +117,7 @@ class UserRoleManager:
                     "telegram_user_id": telegram_user_id,
                     "first_name": first_name or "User",
                     "username": username,
+                    "email": f"{telegram_user_id}@telegram.user",  # Required field
                     "first_bot_interaction_at": datetime.now().isoformat(),
                     "last_activity_at": datetime.now().isoformat()
                 }
