@@ -687,12 +687,16 @@ async def commit_handler(message: Message):
     
     logger.info(f"🎯 Processing commitment from user {user_id}: {commitment_text}")
     
-    # Ensure user exists in database
-    await role_manager.ensure_user_exists(
+    # Ensure user exists in database with error handling
+    user_created = await role_manager.ensure_user_exists(
         user_id, 
         message.from_user.first_name,
         message.from_user.username
     )
+    
+    if not user_created:
+        await message.answer("❌ Error setting up user account. Please try /start first, then try your commitment again.")
+        return
     
     # Test database before proceeding
     if not await DatabaseManager.test_database():
