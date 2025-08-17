@@ -1,0 +1,62 @@
+{
+  "suite": "Dashboard QA Testing",
+  "start_time": "2025-08-17T10:55:33.757372",
+  "environment": "staging",
+  "tests": {
+    "database_integration": {
+      "status": "passed",
+      "user_count": 31,
+      "commitment_count": 75,
+      "accessible_tables": [
+        "users",
+        "commitments",
+        "pods",
+        "pod_memberships"
+      ],
+      "all_tables_accessible": true
+    },
+    "feature_flags": {
+      "status": "passed",
+      "environment": "staging",
+      "features_enabled": 3,
+      "safety_mode": false,
+      "all_flags_correct": true
+    },
+    "business_intelligence": {
+      "status": "passed",
+      "load_time": "1.55s",
+      "onboarding_rate": 16.1,
+      "completion_rate": 48.0,
+      "all_sections_present": true
+    },
+    "admin_dashboard": {
+      "status": "passed",
+      "html_size": 29970,
+      "generation_time": "0.000s",
+      "missing_elements": [],
+      "has_all_elements": true
+    },
+    "user_metrics": {
+      "status": "passed",
+      "load_time": "1.32s",
+      "test_user_id": "217b289c-8f5e-4915-82cf-c2f5c30b8b7e",
+      "all_sections_present": true,
+      "user_total_commitments": 0
+    },
+    "performance": {
+      "status": "passed",
+      "bi_load_time": "1.16s",
+      "dashboard_gen_time": "0.000s",
+      "bi_performance_good": true,
+      "dashboard_performance_good": true
+    }
+  },
+  "summary": {
+    "total_tests": 6,
+    "passed_tests": 6,
+    "failed_tests": 0,
+    "success_rate": "100.0%",
+    "overall_status": "PASSED"
+  },
+  "end_time": "2025-08-17T10:55:39.556402"
+}

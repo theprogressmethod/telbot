@@ -159,6 +159,11 @@ class OnboardingStates(StatesGroup):
     waiting_for_accountability = State()
     waiting_for_comprehensive_info = State()
 
+class FirstImpressionStates(StatesGroup):
+    waiting_for_first_goal = State()
+    celebrating_first_win = State()
+    collecting_bigger_goal = State()
+
 class SmartAnalysis:
     """SMART goal analysis class with secure configuration"""
     
@@ -448,6 +453,7 @@ from pod_week_tracker import PodWeekTracker
 # from attendance_adapter import AttendanceAdapter  # Temporarily disabled - missing module
 from nurture_sequences import NurtureSequences, SequenceType
 from enhanced_user_onboarding import EnhancedUserOnboarding
+from first_impression_experience import FirstImpressionExperience
 role_manager = UserRoleManager(supabase)
 user_analytics = UserAnalytics(supabase)
 # dream_analytics = DreamFocusedAnalytics(supabase)  # Temporarily disabled
@@ -456,6 +462,7 @@ pod_tracker = PodWeekTracker(supabase)
 # meet_tracker = AttendanceAdapter(supabase)  # Temporarily disabled
 nurture_system = NurtureSequences(supabase)
 onboarding_system = EnhancedUserOnboarding(supabase)
+first_impression = FirstImpressionExperience(supabase, openai)
 
 # Temporary storage for callback data (use Redis in production)
 temp_storage = {}
@@ -591,8 +598,8 @@ async def start_handler(message: Message, state: FSMContext):
     db_test = await DatabaseManager.test_database()
     
     if is_first_time:
-        # Enhanced first-time user experience with immediate data collection
-        welcome_text = await onboarding_system.handle_first_time_user(user_id, user_name, username)
+        # 100x First Impression Experience - instant value, zero friction
+        welcome_text = await first_impression.handle_zero_friction_onboarding(user_id, user_name, username)
     else:
         # Returning user - personalized based on roles
         has_pod = "pod_member" in user_roles
@@ -625,9 +632,9 @@ async def start_handler(message: Message, state: FSMContext):
     
     await message.answer(welcome_text, parse_mode="Markdown")
     
-    # Set FSM state for first-time users to handle comprehensive onboarding response
+    # Set FSM state for first-time users for 100x experience
     if is_first_time:
-        await state.set_state(OnboardingStates.waiting_for_comprehensive_info)
+        await state.set_state(FirstImpressionStates.waiting_for_first_goal)
     
     # Trigger nurture sequence for first-time users
     if is_first_time:
@@ -923,7 +930,7 @@ async def done_handler(message: Message):
     await message.answer(message_text, reply_markup=keyboard)
 
 @dp.callback_query(F.data.startswith("complete_"))
-async def complete_commitment_callback(callback: CallbackQuery):
+async def complete_commitment_callback(callback: CallbackQuery, state: FSMContext):
     """Handle commitment completion"""
     commitment_id = callback.data.split("_", 1)[1]
     user_id = callback.from_user.id
@@ -937,8 +944,27 @@ async def complete_commitment_callback(callback: CallbackQuery):
         await callback.answer("❌ Error marking commitment complete. Please try again.", show_alert=True)
         return
     
-    # Send celebration
-    await callback.answer("✅ Marked as complete! Great job! 🎉")
+    # Check if this is their first completion for special celebration
+    should_celebrate = await first_impression.should_trigger_celebration(user_id)
+    
+    if should_celebrate:
+        # Send massive first completion celebration
+        user_name = callback.from_user.first_name or "Champion"
+        celebration_message = await first_impression.handle_first_completion_celebration(user_id, user_name)
+        await callback.message.answer(celebration_message, parse_mode="Markdown")
+        
+        # Progressive data collection - ask for bigger goal
+        bigger_goal_prompt = await first_impression.progressive_data_collection(user_id, user_name)
+        await callback.message.answer(bigger_goal_prompt, parse_mode="Markdown")
+        
+        # Set state for bigger goal collection
+        await state.set_state(FirstImpressionStates.collecting_bigger_goal)
+        
+        # Send celebration
+        await callback.answer("🔥 FIRST WIN! You're amazing! 🔥")
+    else:
+        # Send normal celebration
+        await callback.answer("✅ Marked as complete! Great job! 🎉")
     
     # Get remaining commitments
     remaining_commitments = await DatabaseManager.get_active_commitments(user_id)
@@ -1759,6 +1785,75 @@ async def handle_comprehensive_onboarding(message: Message, state: FSMContext):
         logger.error(f"Error handling comprehensive onboarding: {e}")
         await state.clear()
         await message.answer("Sorry, there was an error processing your information. Please try again!")
+
+# First Impression Experience handlers
+@dp.message(FirstImpressionStates.waiting_for_first_goal)
+async def handle_first_goal_magic(message: Message, state: FSMContext):
+    """Handle first goal input and create instant magic experience"""
+    user_id = message.from_user.id
+    user_name = message.from_user.first_name or "Champion"
+    user_input = message.text.strip()
+    
+    try:
+        # Create the magic experience
+        result = await first_impression.handle_first_goal_input(user_id, user_input, user_name)
+        
+        if result["status"] == "magic_created":
+            await state.set_state(FirstImpressionStates.celebrating_first_win)
+            await message.answer(result["message"], parse_mode="Markdown")
+        elif result["status"] == "error":
+            await state.clear()
+            await message.answer(result["message"], parse_mode="Markdown")
+        else:
+            await state.clear()
+            await message.answer("Something amazing is happening... let me set that up for you! 🚀")
+            
+    except Exception as e:
+        logger.error(f"Error in first goal magic: {e}")
+        await state.clear()
+        await message.answer(f"🎯 Love the energy, {user_name}! Let me save that for you and we'll get started! 🚀")
+
+@dp.message(FirstImpressionStates.collecting_bigger_goal)
+async def handle_bigger_goal_collection(message: Message, state: FSMContext):
+    """Handle bigger goal collection during progressive onboarding"""
+    user_id = message.from_user.id
+    user_name = message.from_user.first_name or "Champion"
+    bigger_goal = message.text.strip()
+    
+    try:
+        # Save the bigger goal
+        supabase.table("users").update({
+            "goal_90_days": bigger_goal,
+            "status": "first_impression_complete",
+            "bigger_goal_collected_at": datetime.now().isoformat()
+        }).eq("telegram_user_id", user_id).execute()
+        
+        await state.clear()
+        
+        # Show completion message with next steps
+        completion_message = f"""🎯 **Perfect, {user_name}!**
+
+**Your bigger goal:** "{bigger_goal}"
+
+I'll keep this in mind as I help you build momentum toward it! 
+
+**You're all set up! Here's what you can do:**
+
+🚀 **/commit** - Add your next commitment
+📊 **/progress** - See your wins adding up  
+🏆 **/leaderboard** - Compare with other champions
+💪 **/help** - Explore all features
+
+**Welcome to your transformation journey!** 💪
+
+*What's your next commitment going to be?*"""
+
+        await message.answer(completion_message, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Error collecting bigger goal: {e}")
+        await state.clear()
+        await message.answer(f"Got it, {user_name}! I'll remember that goal as we work together. Ready for your next commitment? 🚀")
 
 async def set_bot_commands():
     """Set bot commands for the menu"""

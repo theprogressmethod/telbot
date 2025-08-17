@@ -1,0 +1,85 @@
+{
+  "phase": "Phase 1: Dev Testing",
+  "start_time": "2025-08-17T10:46:25.162404",
+  "environment": "development",
+  "tests": {
+    "Component Initialization": {
+      "test_name": "Component Initialization",
+      "passed": true,
+      "components": {
+        "BusinessIntelligenceDashboard": "\u2705 Initialized",
+        "SuperiorOnboardingSequence": "\u2705 Initialized",
+        "UserFacingMetrics": "\u2705 Initialized",
+        "OptimizedNurtureSequences": "\u2705 Initialized"
+      }
+    },
+    "Database Operations": {
+      "test_name": "Database Operations",
+      "passed": false,
+      "operations": {
+        "read_users": "\u2705 Found 1 users",
+        "error": "\u274c {'message': 'duplicate key value violates unique constraint \"users_telegram_user_id_key\"', 'code': '23505', 'hint': None, 'details': 'Key (telegram_user_id)=(999999999) already exists.'}"
+      }
+    },
+    "Superior Onboarding Flow": {
+      "test_name": "Superior Onboarding Flow",
+      "passed": false,
+      "steps": {
+        "user_creation": "\u2705 Test user created",
+        "trigger": "\u274c Failed to trigger"
+      }
+    },
+    "Business Intelligence Metrics": {
+      "test_name": "Business Intelligence Metrics",
+      "passed": true,
+      "metrics": {
+        "onboarding_funnel.conversion_rate": "\u2705 16.1",
+        "behavioral_insights.completion_rate": "\u2705 48.0",
+        "retention_analysis.week_1_retention": "\u2705 0",
+        "growth_indicators.growth_rate": "\u2705 0"
+      }
+    },
+    "Admin Dashboard Generation": {
+      "test_name": "Admin Dashboard Generation",
+      "passed": true,
+      "checks": {
+        "html_size": "\u2705 29970 characters",
+        "business-intelligence": "\u2705 Present",
+        "onboarding-rate": "\u2705 Present",
+        "completion-rate": "\u2705 Present",
+        "retention-rate": "\u2705 Present",
+        "Business Intelligence Dashboard": "\u2705 Present"
+      }
+    },
+    "User-Facing Metrics": {
+      "test_name": "User-Facing Metrics",
+      "passed": false,
+      "metrics": {},
+      "error": "{'message': 'duplicate key value violates unique constraint \"users_telegram_user_id_key\"', 'code': '23505', 'hint': None, 'details': 'Key (telegram_user_id)=(99999) already exists.'}"
+    },
+    "Optimized Nurture Sequences": {
+      "test_name": "Optimized Nurture Sequences",
+      "passed": true,
+      "sequences": {
+        "optimization": "\u2705 1 sequences recommended",
+        "metrics": "\u2705 4 sequence metrics"
+      }
+    },
+    "Complete Integration Flow": {
+      "test_name": "Complete Integration Flow",
+      "passed": false,
+      "flow": {
+        "analysis": "\u2705 Analysis complete",
+        "integration": "\u26a0\ufe0f Some integration issues"
+      }
+    }
+  },
+  "summary": {
+    "total_tests": 8,
+    "passed": 4,
+    "failed": 4,
+    "success_rate": "50.0%",
+    "status": "NOT READY"
+  },
+  "end_time": "2025-08-17T10:46:32.242096"
+}
