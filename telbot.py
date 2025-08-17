@@ -153,6 +153,11 @@ class CommitmentStates(StatesGroup):
     waiting_for_commitment = State()
     processing_smart = State()
 
+class OnboardingStates(StatesGroup):
+    waiting_for_email = State()
+    waiting_for_goal = State()
+    waiting_for_accountability = State()
+
 class SmartAnalysis:
     """SMART goal analysis class with secure configuration"""
     
@@ -1535,7 +1540,7 @@ async def fix_loading_handler(message: Message):
     )
 
 @dp.message()
-async def handle_text_messages(message: Message):
+async def handle_text_messages(message: Message, state: FSMContext):
     """Handle all other text messages with enhanced onboarding"""
     user_id = message.from_user.id
     text = message.text.lower()
@@ -1573,6 +1578,14 @@ async def handle_text_messages(message: Message):
         if should_collect:
             data_request = await onboarding_system.create_gentle_data_request(user_id)
             if data_request:
+                # Determine which state to set based on the request content
+                if "email" in data_request.lower():
+                    await state.set_state(OnboardingStates.waiting_for_email)
+                elif "goal" in data_request.lower():
+                    await state.set_state(OnboardingStates.waiting_for_goal)
+                elif "accountability" in data_request.lower():
+                    await state.set_state(OnboardingStates.waiting_for_accountability)
+                    
                 await message.answer(data_request, parse_mode="Markdown")
                 return
         
@@ -1582,6 +1595,130 @@ async def handle_text_messages(message: Message):
             "/commit <your commitment> - Add a new commitment\n"
             "/done - Mark commitments complete\n"
             "/help - See all commands"
+        )
+
+# Onboarding state handlers
+@dp.message(OnboardingStates.waiting_for_email)
+async def handle_email_input(message: Message, state: FSMContext):
+    """Handle email input during onboarding"""
+    user_id = message.from_user.id
+    email = message.text.strip()
+    
+    # Basic email validation
+    if "@" in email and "." in email.split("@")[-1]:
+        try:
+            # Update user email in database
+            result = supabase.table("users").update({
+                "email": email
+            }).eq("telegram_user_id", user_id).execute()
+            
+            await state.clear()
+            await message.answer(
+                f"✅ Perfect! I've saved your email: {email}\n\n"
+                "This helps us sync your progress across platforms. Thanks! 🙌"
+            )
+            
+            # Check if there are more onboarding steps needed
+            should_collect = await onboarding_system.should_trigger_data_collection(user_id)
+            if should_collect:
+                data_request = await onboarding_system.create_gentle_data_request(user_id)
+                if data_request:
+                    if "goal" in data_request.lower():
+                        await state.set_state(OnboardingStates.waiting_for_goal)
+                    elif "accountability" in data_request.lower():
+                        await state.set_state(OnboardingStates.waiting_for_accountability)
+                    await message.answer(data_request, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Error saving email: {e}")
+            await state.clear()
+            await message.answer("Sorry, there was an error saving your email. You can try again later!")
+    else:
+        await message.answer(
+            "That doesn't look like a valid email address. Could you try again?\n\n"
+            "Example: your.email@example.com"
+        )
+
+@dp.message(OnboardingStates.waiting_for_goal)
+async def handle_goal_input(message: Message, state: FSMContext):
+    """Handle goal input during onboarding"""
+    user_id = message.from_user.id
+    goal = message.text.strip()
+    
+    if len(goal) > 5:  # Basic validation
+        try:
+            # Update user goal in database
+            result = supabase.table("users").update({
+                "goal_90_days": goal
+            }).eq("telegram_user_id", user_id).execute()
+            
+            await state.clear()
+            await message.answer(
+                f"🎯 Awesome goal: \"{goal}\"\n\n"
+                "I'll keep this in mind when helping you stay accountable! 💪"
+            )
+            
+            # Check if there are more onboarding steps needed
+            should_collect = await onboarding_system.should_trigger_data_collection(user_id)
+            if should_collect:
+                data_request = await onboarding_system.create_gentle_data_request(user_id)
+                if data_request:
+                    if "accountability" in data_request.lower():
+                        await state.set_state(OnboardingStates.waiting_for_accountability)
+                    await message.answer(data_request, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Error saving goal: {e}")
+            await state.clear()
+            await message.answer("Sorry, there was an error saving your goal. You can try again later!")
+    else:
+        await message.answer(
+            "Could you share a bit more detail about your goal? A few words is fine! 🎯"
+        )
+
+@dp.message(OnboardingStates.waiting_for_accountability)
+async def handle_accountability_input(message: Message, state: FSMContext):
+    """Handle accountability preference input during onboarding"""
+    user_id = message.from_user.id
+    response = message.text.strip()
+    
+    # Map responses to accountability styles
+    accountability_map = {
+        "1": "solo_focus",
+        "2": "small_group", 
+        "3": "community",
+        "4": "exploring"
+    }
+    
+    if response in accountability_map:
+        style = accountability_map[response]
+        try:
+            # Update user accountability style in database
+            result = supabase.table("users").update({
+                "accountability_style": style
+            }).eq("telegram_user_id", user_id).execute()
+            
+            await state.clear()
+            
+            style_messages = {
+                "solo_focus": "Perfect! I'll focus on daily check-ins and personal accountability. 📱",
+                "small_group": "Great choice! Small groups are powerful for accountability. We'll let you know about pod opportunities! 👥",
+                "community": "Awesome! Community support can be amazing. We'll keep you posted on group activities! 🌟",
+                "exploring": "No worries! We'll help you figure out what works best as you go. 🧭"
+            }
+            
+            await message.answer(
+                f"✅ {style_messages[style]}\n\n"
+                "Thanks for helping me personalize your experience! 🚀"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error saving accountability style: {e}")
+            await state.clear()
+            await message.answer("Sorry, there was an error saving your preference. You can try again later!")
+    else:
+        await message.answer(
+            "Please reply with just the number (1, 2, 3, or 4) for your preference! 😊"
         )
 
 async def set_bot_commands():
