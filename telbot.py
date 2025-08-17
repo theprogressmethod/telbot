@@ -704,6 +704,15 @@ async def commit_handler(message: Message):
     
     logger.info(f"🎯 Processing commitment from user {user_id}: {commitment_text}")
     
+    # Check if this is a first-time user who should go through the new experience
+    is_first_time = await role_manager.is_first_time_user(user_id)
+    if is_first_time:
+        await message.answer(
+            "✨ Welcome! Let's get you set up for success first.\n\n"
+            "Use /start to unlock your personalized progress coach, then come back to make this commitment! 🚀"
+        )
+        return
+    
     # Ensure user exists in database with error handling
     user_created = await role_manager.ensure_user_exists(
         user_id, 
