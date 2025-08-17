@@ -84,6 +84,39 @@ async def health_check():
     """Health check for monitoring"""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
+@app.get("/webhook/health")
+async def webhook_health():
+    """Specific health check for webhook functionality"""
+    try:
+        # Check if we can import bot components
+        from telbot import bot, dp, config
+        
+        # Check environment variables
+        env_status = {
+            "BOT_TOKEN": bool(os.getenv("BOT_TOKEN")),
+            "SUPABASE_URL": bool(os.getenv("SUPABASE_URL")),
+            "SUPABASE_KEY": bool(os.getenv("SUPABASE_KEY")),
+            "OPENAI_API_KEY": bool(os.getenv("OPENAI_API_KEY"))
+        }
+        
+        missing_vars = [k for k, v in env_status.items() if not v]
+        
+        return {
+            "status": "healthy" if not missing_vars else "degraded",
+            "timestamp": datetime.now().isoformat(),
+            "environment_variables": env_status,
+            "missing_variables": missing_vars,
+            "bot_configured": bool(bot),
+            "dispatcher_configured": bool(dp)
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
+
 # ========================================
 # BOT WEBHOOK ENDPOINTS (CRITICAL - DON'T CHANGE)
 # ========================================
@@ -92,23 +125,45 @@ async def health_check():
 async def webhook_handler(request: Request):
     """Handle incoming webhooks from Telegram"""
     try:
-        # Import bot components only when needed
-        from telbot import bot, dp
-        from aiogram.types import Update
-        
         # Get request body
         data = await request.json()
-        logger.info(f"Webhook received: {json.dumps(data)[:200]}...")
+        logger.info(f"Webhook received update_id: {data.get('update_id', 'unknown')}")
+        
+        # Validate basic structure
+        if not isinstance(data, dict):
+            logger.error("Invalid webhook data - not a dict")
+            return {"ok": False, "error": "Invalid data format"}
+        
+        # Import bot components only when needed
+        try:
+            from telbot import bot, dp
+            from aiogram.types import Update
+        except ImportError as ie:
+            logger.error(f"Import error: {ie}")
+            return {"ok": False, "error": "Bot import failed"}
+        
+        # Validate Update object more safely
+        try:
+            update = Update.model_validate(data)
+        except Exception as ve:
+            logger.error(f"Validation error: {ve}")
+            logger.error(f"Data structure: {json.dumps(data, indent=2)}")
+            return {"ok": False, "error": f"Validation failed: {str(ve)}"}
         
         # Process update
-        update = Update(**data)
         await dp.feed_update(bot, update)
         
         return {"ok": True}
         
+    except json.JSONDecodeError as je:
+        logger.error(f"JSON decode error: {je}")
+        return {"ok": False, "error": "Invalid JSON"}
     except Exception as e:
         logger.error(f"Webhook error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {"ok": False, "error": str(e)}
 
 @app.get("/set_webhook")
 async def set_webhook():
