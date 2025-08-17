@@ -92,3 +92,8 @@ render_deployment_config.yaml
 
 # Vercel
 .vercel
+
+# Analysis and documentation directories (business intelligence work)
+analysis/
+docs/
+*.txt
