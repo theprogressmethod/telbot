@@ -14,6 +14,7 @@ import json
 import logging
 from dotenv import load_dotenv
 from supabase import create_client
+from webhook_monitoring import add_webhook_monitoring_routes, track_webhook_request
 
 # Load environment
 load_dotenv()
@@ -121,6 +122,9 @@ async def webhook_health():
 # BOT WEBHOOK ENDPOINTS (CRITICAL - DON'T CHANGE)
 # ========================================
 
+
+# Add webhook monitoring routes
+add_webhook_monitoring_routes(app)
 @app.post("/webhook")
 async def webhook_handler(request: Request):
     """Handle incoming webhooks from Telegram"""
@@ -132,6 +136,7 @@ async def webhook_handler(request: Request):
         # Validate basic structure
         if not isinstance(data, dict):
             logger.error("Invalid webhook data - not a dict")
+            track_webhook_request(False)
             return {"ok": False, "error": "Invalid data format"}
         
         # Import bot components only when needed
@@ -140,6 +145,7 @@ async def webhook_handler(request: Request):
             from aiogram.types import Update
         except ImportError as ie:
             logger.error(f"Import error: {ie}")
+            track_webhook_request(False)
             return {"ok": False, "error": "Bot import failed"}
         
         # Validate Update object more safely
@@ -148,11 +154,13 @@ async def webhook_handler(request: Request):
         except Exception as ve:
             logger.error(f"Validation error: {ve}")
             logger.error(f"Data structure: {json.dumps(data, indent=2)}")
+            track_webhook_request(False)
             return {"ok": False, "error": f"Validation failed: {str(ve)}"}
         
         # Process update
         await dp.feed_update(bot, update)
         
+        track_webhook_request(True)
         return {"ok": True}
         
     except json.JSONDecodeError as je:
