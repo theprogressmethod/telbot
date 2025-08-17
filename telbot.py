@@ -1550,6 +1550,12 @@ async def handle_text_messages(message: Message, state: FSMContext):
     user_id = message.from_user.id
     text = message.text.lower()
     
+    # Check if we're in any FSM state - if so, let the specific handlers deal with it
+    current_state = await state.get_state()
+    if current_state is not None:
+        # We're in an FSM state, let the specific handlers process this
+        return
+    
     # First, check if user needs onboarding data
     needs_onboarding = await onboarding_system.check_user_needs_onboarding_data(user_id)
     
