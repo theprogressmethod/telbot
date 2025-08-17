@@ -252,6 +252,47 @@ async def webhook_info():
         logger.error(f"Webhook info error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/debug/tables")
+async def debug_tables():
+    """Debug endpoint to check table existence and schemas"""
+    try:
+        if not supabase:
+            return {"error": "Supabase not initialized", "success": False}
+        
+        result = {"tables": {}, "timestamp": datetime.now().isoformat()}
+        
+        # Test users table
+        try:
+            users_result = supabase.table("users").select("*").limit(1).execute()
+            result["tables"]["users"] = {
+                "exists": True,
+                "sample_data": users_result.data[0] if users_result.data else None,
+                "count": len(users_result.data)
+            }
+        except Exception as e:
+            result["tables"]["users"] = {"exists": False, "error": str(e)}
+        
+        # Test commitments table
+        try:
+            commitments_result = supabase.table("commitments").select("*").limit(1).execute()
+            result["tables"]["commitments"] = {
+                "exists": True,
+                "sample_data": commitments_result.data[0] if commitments_result.data else None,
+                "count": len(commitments_result.data)
+            }
+        except Exception as e:
+            result["tables"]["commitments"] = {"exists": False, "error": str(e)}
+            
+        return result
+        
+    except Exception as e:
+        return {
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "success": False,
+            "timestamp": datetime.now().isoformat()
+        }
+
 @app.get("/debug/commitment/{telegram_user_id}")
 async def debug_commitment_save(telegram_user_id: int):
     """Debug endpoint to test commitment saving process"""
@@ -282,7 +323,7 @@ async def debug_commitment_save(telegram_user_id: int):
                     "telegram_user_id": telegram_user_id,
                     "commitment": "DEBUG TEST COMMITMENT - IGNORE",
                     "original_commitment": "DEBUG TEST COMMITMENT - IGNORE",
-                    "status": "test",
+                    "status": "active",
                     "smart_score": 1,
                     "created_at": datetime.now().isoformat()
                 }
