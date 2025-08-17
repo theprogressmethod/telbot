@@ -43,7 +43,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     supabase = None
 else:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    logger.info("✅ Supabase client initialized")
+    logger.info("✅ Supabase client initialized (v2)")
 
 # Create FastAPI app
 app = FastAPI(
