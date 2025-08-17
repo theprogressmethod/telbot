@@ -138,8 +138,13 @@ class UserRoleManager:
             return True
             
         except Exception as e:
-            logger.error(f"Error ensuring user exists: {e}")
-            return False
+            # Check if it's a duplicate key error (user already exists)
+            if "duplicate key value violates unique constraint" in str(e):
+                logger.info(f"User {telegram_user_id} already exists (duplicate key), returning True")
+                return True
+            else:
+                logger.error(f"Error ensuring user exists: {e}")
+                return False
     
     async def is_first_time_user(self, telegram_user_id: int) -> bool:
         """Check if this is a first-time user (no commitments, no pod memberships)"""
