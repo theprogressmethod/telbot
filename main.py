@@ -14,6 +14,8 @@ import json
 import logging
 from dotenv import load_dotenv
 from supabase import create_client
+from essential_business_dashboard import add_business_metrics_routes
+from nurture_control_dashboard import add_nurture_control_routes
 try:
     from webhook_monitoring import add_webhook_monitoring_routes, track_webhook_request
     monitoring_available = True
@@ -136,6 +138,11 @@ if monitoring_available:
     logger.info("✅ Webhook monitoring routes added")
 else:
     logger.warning("⚠️ Webhook monitoring routes not available")
+
+# Add essential business dashboard routes
+add_business_metrics_routes(app)
+add_nurture_control_routes(app)
+logger.info("✅ Essential dashboard routes added")
 @app.post("/webhook")
 async def webhook_handler(request: Request):
     """Handle incoming webhooks from Telegram"""
