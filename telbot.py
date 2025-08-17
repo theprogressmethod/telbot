@@ -993,6 +993,13 @@ async def save_smart_callback(callback: CallbackQuery):
         await callback.answer("Session expired. Please try again.", show_alert=True)
         return
     
+    # Ensure user exists before saving
+    await role_manager.ensure_user_exists(
+        user_id,
+        callback.from_user.first_name,
+        callback.from_user.username
+    )
+    
     # Save SMART version
     success = await DatabaseManager.save_commitment(
         telegram_user_id=user_id,
@@ -1027,6 +1034,13 @@ async def save_original_callback(callback: CallbackQuery):
     if not stored_data:
         await callback.answer("Session expired. Please try again.", show_alert=True)
         return
+    
+    # Ensure user exists before saving
+    await role_manager.ensure_user_exists(
+        user_id,
+        callback.from_user.first_name,
+        callback.from_user.username
+    )
     
     # Save original version
     success = await DatabaseManager.save_commitment(
