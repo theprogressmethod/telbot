@@ -9,6 +9,35 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from datetime import datetime
 
+def add_superadmin_routes(app: FastAPI):
+    """Add SuperAdmin dashboard routes"""
+    
+    @app.get("/superadmin", response_class=HTMLResponse)
+    async def superadmin_dashboard():
+        """SuperAdmin dashboard"""
+        return get_retro_superadmin_html()
+    
+    @app.get("/superadmin/status")
+    async def superadmin_status():
+        """SuperAdmin status endpoint"""
+        return {
+            "status": "online",
+            "environment": os.getenv('ENVIRONMENT', 'development'),
+            "timestamp": datetime.now().isoformat(),
+            "uptime": "24h",
+            "dashboards": {
+                "admin_dashboard": "/admin/dashboard",
+                "business_metrics": "/admin/business-metrics", 
+                "nurture_control": "/admin/nurture-control",
+                "api_docs": "/docs"
+            },
+            "system_info": {
+                "database": "supabase.co",
+                "runtime": "fastapi",
+                "core": "behavioral_intelligence_v2"
+            }
+        }
+
 def get_retro_superadmin_html():
     """Generate retro terminal-style SuperAdmin dashboard"""
     environment = os.getenv('ENVIRONMENT', 'development')

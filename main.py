@@ -16,6 +16,8 @@ from dotenv import load_dotenv
 from supabase import create_client
 from essential_business_dashboard import add_business_metrics_routes
 from nurture_control_dashboard import add_nurture_control_routes
+from retro_admin_dashboard import add_retro_admin_routes
+from retro_superadmin_dashboard import add_superadmin_routes
 # Load environment
 load_dotenv()
 
@@ -142,7 +144,12 @@ else:
 # Add essential business dashboard routes
 add_business_metrics_routes(app)
 add_nurture_control_routes(app)
+add_superadmin_routes(app)
 logger.info("✅ Essential dashboard routes added")
+
+# Override admin dashboard with retro version
+add_retro_admin_routes(app)
+logger.info("✅ Retro admin dashboard added")
 @app.post("/webhook")
 async def webhook_handler(request: Request):
     """Handle incoming webhooks from Telegram"""
