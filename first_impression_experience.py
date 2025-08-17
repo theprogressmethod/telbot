@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 class FirstImpressionExperience:
     """100x better first-time user experience - instant value, zero friction"""
     
-    def __init__(self, supabase_client: Client, openai_client: openai.OpenAI):
+    def __init__(self, supabase_client: Client, openai_client):
         self.supabase = supabase_client
-        self.openai = openai_client
+        self.openai_client = openai_client
     
     async def handle_zero_friction_onboarding(self, telegram_user_id: int, first_name: str, username: str) -> str:
         """Phase 1: Instant engagement with zero friction"""
@@ -177,8 +177,8 @@ Make it personal, inspiring, and believable. Avoid generic responses."""
 
             response = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: self.openai.chat.completions.create(
-                    model="gpt-4",
+                lambda: self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",  # Use the same model as the rest of the bot
                     messages=[
                         {"role": "system", "content": "You are an expert motivational coach who sees the bigger picture in people's goals."},
                         {"role": "user", "content": prompt}
@@ -211,7 +211,17 @@ Make it personal, inspiring, and believable. Avoid generic responses."""
     async def _save_first_commitment(self, telegram_user_id: int, commitment_text: str) -> bool:
         """Save their first commitment with special marking"""
         try:
+            # Get user UUID from telegram_user_id (matching the regular flow)
+            user_result = self.supabase.table("users").select("id").eq("telegram_user_id", telegram_user_id).execute()
+            
+            if not user_result.data:
+                logger.error(f"User not found for telegram_user_id: {telegram_user_id}")
+                return False
+            
+            user_uuid = user_result.data[0]["id"]
+            
             result = self.supabase.table("commitments").insert({
+                "user_id": user_uuid,  # Use UUID instead of telegram_user_id
                 "telegram_user_id": telegram_user_id,
                 "commitment": commitment_text,
                 "original_commitment": commitment_text,
@@ -229,6 +239,7 @@ Make it personal, inspiring, and believable. Avoid generic responses."""
             
         except Exception as e:
             logger.error(f"Error saving first commitment: {e}")
+            logger.error(f"Error details: {str(e)}")
             return False
     
     async def _silent_user_creation(self, telegram_user_id: int, first_name: str, username: str):

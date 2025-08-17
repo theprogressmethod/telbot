@@ -146,7 +146,8 @@ except Exception as e:
     supabase = None
 
 # Initialize OpenAI with secure config
-openai.api_key = config.openai_api_key
+openai.api_key = config.openai_api_key  # For backward compatibility
+openai_client = openai.OpenAI(api_key=config.openai_api_key)  # New client for first impression
 
 # States for FSM
 class CommitmentStates(StatesGroup):
@@ -462,7 +463,7 @@ pod_tracker = PodWeekTracker(supabase)
 # meet_tracker = AttendanceAdapter(supabase)  # Temporarily disabled
 nurture_system = NurtureSequences(supabase)
 onboarding_system = EnhancedUserOnboarding(supabase)
-first_impression = FirstImpressionExperience(supabase, openai)
+first_impression = FirstImpressionExperience(supabase, openai_client)
 
 # Temporary storage for callback data (use Redis in production)
 temp_storage = {}
@@ -1803,9 +1804,13 @@ async def handle_first_goal_magic(message: Message, state: FSMContext):
     user_name = message.from_user.first_name or "Champion"
     user_input = message.text.strip()
     
+    logger.info(f"🎯 First goal magic handler triggered for user {user_id}: {user_input}")
+    
     try:
         # Create the magic experience
         result = await first_impression.handle_first_goal_input(user_id, user_input, user_name)
+        
+        logger.info(f"First impression result: {result.get('status', 'unknown')}")
         
         if result["status"] == "magic_created":
             await state.set_state(FirstImpressionStates.celebrating_first_win)
@@ -1819,6 +1824,9 @@ async def handle_first_goal_magic(message: Message, state: FSMContext):
             
     except Exception as e:
         logger.error(f"Error in first goal magic: {e}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         await state.clear()
         await message.answer(f"🎯 Love the energy, {user_name}! Let me save that for you and we'll get started! 🚀")
 
