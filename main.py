@@ -94,7 +94,7 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check for monitoring"""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    return {"status": "healthy", "timestamp": datetime.now().isoformat(), "version": "commitment-fix-v2"}
 
 @app.get("/webhook/health")
 async def webhook_health():
