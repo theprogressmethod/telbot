@@ -14,7 +14,14 @@ import json
 import logging
 from dotenv import load_dotenv
 from supabase import create_client
-from webhook_monitoring import add_webhook_monitoring_routes, track_webhook_request
+try:
+    from webhook_monitoring import add_webhook_monitoring_routes, track_webhook_request
+    monitoring_available = True
+except ImportError as e:
+    logger.warning(f"Monitoring not available: {e}")
+    monitoring_available = False
+    def track_webhook_request(success: bool):
+        pass  # No-op if monitoring not available
 
 # Load environment
 load_dotenv()
@@ -124,7 +131,11 @@ async def webhook_health():
 
 
 # Add webhook monitoring routes
-add_webhook_monitoring_routes(app)
+if monitoring_available:
+    add_webhook_monitoring_routes(app)
+    logger.info("✅ Webhook monitoring routes added")
+else:
+    logger.warning("⚠️ Webhook monitoring routes not available")
 @app.post("/webhook")
 async def webhook_handler(request: Request):
     """Handle incoming webhooks from Telegram"""
