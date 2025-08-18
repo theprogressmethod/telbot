@@ -19,9 +19,10 @@ logger = logging.getLogger(__name__)
 class FirstImpressionExperience:
     """100x better first-time user experience - instant value, zero friction"""
     
-    def __init__(self, supabase_client: Client, openai_client):
+    def __init__(self, supabase_client: Client, openai_client, onboarding_manager=None):
         self.supabase = supabase_client
         self.openai_client = openai_client
+        self.onboarding_manager = onboarding_manager
     
     async def handle_zero_friction_onboarding(self, telegram_user_id: int, first_name: str, username: str) -> str:
         """Phase 1: Instant engagement with zero friction"""
@@ -276,21 +277,30 @@ Make it personal, inspiring, and believable. Avoid generic responses."""
     async def _mark_user_has_first_commitment(self, telegram_user_id: int):
         """Mark that user has created their first commitment"""
         try:
+            # Update timestamp but let database trigger handle total_commitments
             self.supabase.table("users").update({
-                "status": "first_commitment_created",
-                "first_commitment_at": datetime.now().isoformat(),
-                "total_commitments": 1
+                "first_commitment_at": datetime.now().isoformat()
             }).eq("telegram_user_id", telegram_user_id).execute()
+            
+            # Use onboarding manager to advance state
+            if self.onboarding_manager:
+                await self.onboarding_manager.advance_to_goal_created(telegram_user_id)
+                
         except Exception as e:
             logger.error(f"Error marking first commitment: {e}")
     
     async def _mark_celebration_complete(self, telegram_user_id: int):
         """Mark celebration as complete"""
         try:
+            # Update timestamp
             self.supabase.table("users").update({
-                "status": "first_impression_complete",
                 "first_celebration_at": datetime.now().isoformat()
             }).eq("telegram_user_id", telegram_user_id).execute()
+            
+            # Use onboarding manager to complete onboarding
+            if self.onboarding_manager:
+                await self.onboarding_manager.complete_onboarding(telegram_user_id)
+                
         except Exception as e:
             logger.error(f"Error marking celebration: {e}")
     
@@ -317,7 +327,29 @@ Make it personal, inspiring, and believable. Avoid generic responses."""
             return {"completions_24h": 127, "new_streaks": 23, "monthly_goals": 8}
     
     async def check_user_in_first_impression_flow(self, telegram_user_id: int) -> str:
-        """Check what stage of first impression flow user is in"""
+        """Check what stage of first impression flow user is in - UNIFIED VERSION"""
+        if not self.onboarding_manager:
+            # Fallback to old method if onboarding manager not available
+            return await self._legacy_check_first_impression_flow(telegram_user_id)
+        
+        try:
+            status = await self.onboarding_manager.get_user_onboarding_status(telegram_user_id)
+            
+            if status == "new":
+                return "waiting_for_first_goal"
+            elif status == "in_progress":
+                return "waiting_for_completion"
+            elif status == "completed":
+                return "ready_for_progressive_onboarding"
+            else:
+                return "normal_user"
+                
+        except Exception as e:
+            logger.error(f"Error checking first impression flow: {e}")
+            return "normal_user"
+    
+    async def _legacy_check_first_impression_flow(self, telegram_user_id: int) -> str:
+        """Legacy method for backwards compatibility"""
         try:
             user_result = self.supabase.table("users").select("status").eq("telegram_user_id", telegram_user_id).execute()
             
@@ -340,7 +372,22 @@ Make it personal, inspiring, and believable. Avoid generic responses."""
             return "normal_user"
     
     async def should_trigger_celebration(self, telegram_user_id: int) -> bool:
-        """Check if user just completed their first commitment"""
+        """Check if user just completed their first commitment - UNIFIED VERSION"""
+        if not self.onboarding_manager:
+            # Fallback to old method if onboarding manager not available
+            return await self._legacy_should_trigger_celebration(telegram_user_id)
+        
+        try:
+            # User should get celebration if they're in "in_progress" state
+            # This means they created a goal but haven't completed onboarding yet
+            return await self.onboarding_manager.is_waiting_for_completion(telegram_user_id)
+            
+        except Exception as e:
+            logger.error(f"Error checking celebration trigger: {e}")
+            return False
+    
+    async def _legacy_should_trigger_celebration(self, telegram_user_id: int) -> bool:
+        """Legacy method for backwards compatibility"""
         try:
             user_result = self.supabase.table("users").select("status").eq("telegram_user_id", telegram_user_id).execute()
             

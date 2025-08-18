@@ -455,6 +455,7 @@ from pod_week_tracker import PodWeekTracker
 from nurture_sequences import NurtureSequences, SequenceType
 from enhanced_user_onboarding import EnhancedUserOnboarding
 from first_impression_experience import FirstImpressionExperience
+from onboarding_manager import OnboardingManager
 role_manager = UserRoleManager(supabase)
 user_analytics = UserAnalytics(supabase)
 # dream_analytics = DreamFocusedAnalytics(supabase)  # Temporarily disabled
@@ -463,7 +464,8 @@ pod_tracker = PodWeekTracker(supabase)
 # meet_tracker = AttendanceAdapter(supabase)  # Temporarily disabled
 nurture_system = NurtureSequences(supabase)
 onboarding_system = EnhancedUserOnboarding(supabase)
-first_impression = FirstImpressionExperience(supabase, openai_client)
+onboarding_manager = OnboardingManager(supabase)
+first_impression = FirstImpressionExperience(supabase, openai_client, onboarding_manager)
 
 # Temporary storage for callback data (use Redis in production)
 temp_storage = {}
@@ -591,14 +593,17 @@ async def start_handler(message: Message, state: FSMContext):
     # Ensure user exists in database and get role info
     await role_manager.ensure_user_exists(user_id, user_name, username)
     
-    # Check if first-time user
-    is_first_time = await role_manager.is_first_time_user(user_id)
+    # Initialize onboarding system (replaces is_first_time_user check)
+    await onboarding_manager.start_onboarding(user_id, user_name, username)
+    
+    # Check onboarding status using unified system
+    should_show_first_impression = await onboarding_manager.should_show_first_impression(user_id)
     user_roles = await role_manager.get_user_roles(user_id)
     
     # Test database on first interaction
     db_test = await DatabaseManager.test_database()
     
-    if is_first_time:
+    if should_show_first_impression:
         # 100x First Impression Experience - instant value, zero friction
         welcome_text = await first_impression.handle_zero_friction_onboarding(user_id, user_name, username)
     else:
@@ -1458,19 +1463,27 @@ async def debug_handler(message: Message, state: FSMContext):
         # Get user roles
         roles = await role_manager.get_user_roles(user_id)
         
+        # Get onboarding status from new system
+        onboarding_status = await onboarding_manager.get_user_onboarding_status(user_id)
+        first_impression_status = await first_impression.check_user_in_first_impression_flow(user_id)
+        
         debug_info = f"""🔍 **Debug Information for User {user_id}**
 
 **FSM State:** {current_state or 'None'}
 
+**🆕 NEW Onboarding Status:** {onboarding_status}
+**📜 Legacy First Impression:** {first_impression_status}
+
 **Database Status:**
-• Status: {user_data.get('status', 'Unknown') if user_data else 'User not found'}
+• Legacy Status: {user_data.get('status', 'Unknown') if user_data else 'User not found'}
+• Onboarding Status: {user_data.get('onboarding_status', 'Not set') if user_data else 'N/A'}
 • First impression started: {user_data.get('first_impression_started_at', 'No') if user_data else 'N/A'}
 • First commitment: {user_data.get('first_commitment_at', 'No') if user_data else 'N/A'}
 • Total commitments: {user_data.get('total_commitments', 0) if user_data else 0}
 
 **Roles:** {', '.join(roles) if roles else 'None'}
 
-**System Status:** ✅ All systems operational
+**System Status:** ✅ Unified onboarding system active
 
 Use /fix to reset if needed."""
         
@@ -1634,9 +1647,9 @@ async def fix_loading_handler(message: Message, state: FSMContext):
         "Try sending me a message now - everything should work perfectly! 🚀"
     )
 
-@dp.message()
+@dp.message(lambda message: message.text and not message.text.startswith('/'))  # Only non-command messages
 async def handle_text_messages(message: Message, state: FSMContext):
-    """Handle all other text messages with enhanced onboarding"""
+    """Handle text messages that aren't handled by specific FSM states"""
     user_id = message.from_user.id
     text = message.text.lower()
     
@@ -1644,35 +1657,49 @@ async def handle_text_messages(message: Message, state: FSMContext):
     current_state = await state.get_state()
     logger.info(f"🔍 Generic handler triggered for user {user_id}: '{message.text}' | State: {current_state}")
     
-    # Check if we're in any FSM state - if so, let the specific handlers deal with it
+    # If user is in an FSM state, this shouldn't happen - the specific handler should have caught it
     if current_state is not None:
-        # We're in an FSM state, let the specific handlers process this
-        logger.warning(f"⚠️ User {user_id} in state {current_state} but reached generic handler - CIRCUIT BREAKER ACTIVATED!")
+        logger.warning(f"⚠️ User {user_id} in state {current_state} reached generic handler - possible handler mismatch!")
         
-        # Circuit breaker: If user has been in a state too long, auto-recover
-        try:
-            user_result = supabase.table("users").select("first_impression_started_at, status").eq("telegram_user_id", user_id).execute()
-            if user_result.data:
-                started_at = user_result.data[0].get("first_impression_started_at")
-                if started_at:
-                    from datetime import datetime, timedelta
-                    started_time = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
-                    if datetime.now(started_time.tzinfo) - started_time > timedelta(minutes=30):
-                        logger.info(f"🔄 Auto-recovering user {user_id} from stale state {current_state}")
-                        # Reset everything
-                        await state.clear()
-                        supabase.table("users").update({"status": "active"}).eq("telegram_user_id", user_id).execute()
-                        await message.answer("🔄 I noticed you were stuck in an old conversation. Let's start fresh! What can I help you with?")
-                        return
-        except Exception as e:
-            logger.error(f"Circuit breaker error: {e}")
+        # Instead of circuit breaker, try to route correctly based on state
+        if current_state == "FirstImpressionStates:waiting_for_first_goal":
+            logger.info(f"🔄 Manually routing to first goal handler for user {user_id}")
+            await handle_first_goal_magic(message, state)
+            return
         
-        # EMERGENCY: Clear the broken state and respond
+        # For other states, clear and restart
+        logger.info(f"🔄 Clearing unknown state {current_state} for user {user_id}")
         await state.clear()
-        await message.answer("I had a technical issue, but I'm back! Try sending your message again. 🤖")
-        return
+        await message.answer("Let me help you start fresh! 🔄")
+        # Fall through to normal handling
     
-    # First, check if user needs onboarding data
+    # Continue with normal routing only if no FSM state
+    
+    # First, check if user is in first impression flow (UNIFIED ROUTING)
+    onboarding_status = await onboarding_manager.get_user_onboarding_status(user_id)
+    
+    if onboarding_status == "new":
+        # User should be seeing first impression welcome - route to first goal
+        await state.set_state(FirstImpressionStates.waiting_for_first_goal)
+        await handle_first_goal_magic(message, state)
+        return
+    elif onboarding_status == "in_progress":
+        # User already created goal, they might be saying done or similar
+        if "done" in message.text.lower() or "finished" in message.text.lower() or "complete" in message.text.lower():
+            # Check if they should get celebration
+            should_celebrate = await first_impression.should_trigger_celebration(user_id)
+            if should_celebrate:
+                response = await first_impression.handle_first_completion_celebration(user_id, message.from_user.first_name or "there")
+                await message.answer(response, parse_mode="Markdown")
+                return
+        else:
+            # Not saying done - might be normal message
+            await message.answer("🎯 Great! When you complete your commitment, just say 'done' and I'll celebrate with you! 🎉")
+            return
+    
+    # If onboarding_status == "completed", continue with normal flow
+    
+    # Legacy onboarding system check (for existing users)
     needs_onboarding = await onboarding_system.check_user_needs_onboarding_data(user_id)
     
     if needs_onboarding:
@@ -1887,17 +1914,20 @@ async def handle_first_goal_magic(message: Message, state: FSMContext):
     logger.info(f"✨ FIRST IMPRESSION HANDLER TRIGGERED for user {user_id}: '{user_input}'")
     
     try:
-        # Create the magic experience
+        # Create the magic experience using the new integrated system
         result = await first_impression.handle_first_goal_input(user_id, user_input, user_name)
         
-        logger.info(f"First impression result: {result.get('status', 'unknown')}")
+        logger.info(f"✅ First impression result: {result.get('status', 'unknown')}")
         
         if result["status"] == "magic_created":
-            await state.set_state(FirstImpressionStates.celebrating_first_win)
+            # Clear FSM state and let onboarding manager handle state
+            await state.clear()
             await message.answer(result["message"], parse_mode="Markdown")
+            logger.info(f"🎉 Magic experience completed for user {user_id}")
         elif result["status"] == "error":
             await state.clear()
             await message.answer(result["message"], parse_mode="Markdown")
+            logger.error(f"❌ First impression error for user {user_id}")
         else:
             await state.clear()
             await message.answer("Something amazing is happening... let me set that up for you! 🚀")
