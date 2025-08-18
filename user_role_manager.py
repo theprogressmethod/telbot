@@ -140,8 +140,24 @@ class UserRoleManager:
         except Exception as e:
             # Check if it's a duplicate key error (user already exists)
             if "duplicate key value violates unique constraint" in str(e):
-                logger.info(f"User {telegram_user_id} already exists (duplicate key), returning True")
-                return True
+                logger.info(f"User {telegram_user_id} already exists (duplicate key), verifying...")
+                # Re-query to ensure user actually exists and update last activity
+                try:
+                    existing_user = self.supabase.table("users").select("id").eq("telegram_user_id", telegram_user_id).execute()
+                    if existing_user.data:
+                        user_id = existing_user.data[0]["id"]
+                        # Update last activity for existing user
+                        self.supabase.table("users").update({
+                            "last_activity_at": datetime.now().isoformat()
+                        }).eq("id", user_id).execute()
+                        logger.info(f"✅ Verified user {telegram_user_id} exists and updated activity")
+                        return True
+                    else:
+                        logger.error(f"❌ User {telegram_user_id} should exist after duplicate key error but not found")
+                        return False
+                except Exception as verify_e:
+                    logger.error(f"❌ Error verifying user after duplicate key: {verify_e}")
+                    return False
             else:
                 logger.error(f"Error ensuring user exists: {e}")
                 return False
