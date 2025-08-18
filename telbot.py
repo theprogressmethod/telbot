@@ -325,6 +325,7 @@ class DatabaseManager:
                     user_data = {
                         "telegram_user_id": telegram_user_id,
                         "first_name": "Emergency User",
+                        "email": f"{telegram_user_id}@telegram.emergency",  # Required field
                         "first_bot_interaction_at": datetime.now().isoformat(),
                         "last_activity_at": datetime.now().isoformat()
                     }
