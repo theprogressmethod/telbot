@@ -604,8 +604,25 @@ async def start_handler(message: Message, state: FSMContext):
     db_test = await DatabaseManager.test_database()
     
     if should_show_first_impression:
-        # 100x First Impression Experience - instant value, zero friction
-        welcome_text = await first_impression.handle_zero_friction_onboarding(user_id, user_name, username)
+        # GRACEFUL BYPASS: Avoid FSM states, provide direct experience
+        welcome_text = f"""🎯 **Hey {user_name}!** 
+
+Welcome to your Personal Progress Coach! ⚡
+
+I help people like you turn big dreams into daily wins.
+
+**Let's start simple - try one of these:**
+
+📝 `/commit I want to finish this project today`
+📝 `/commit I will exercise for 30 minutes`
+📝 `/commit I'll read 10 pages of my book`
+
+✅ Then use `/done` when you complete it
+📊 Use `/progress` to see your wins adding up
+
+*No complicated setup - just results!* 🚀
+
+**Need help?** Use `/help` to see all commands."""
     else:
         # Returning user - personalized based on roles
         has_pod = "pod_member" in user_roles
@@ -1643,8 +1660,13 @@ async def fix_loading_handler(message: Message, state: FSMContext):
     await message.answer(
         "🔧 **Emergency Reset Complete!**\n\n"
         "✅ Cleared your conversation state\n"
-        "✅ Reset your account status\n\n"
-        "Try sending me a message now - everything should work perfectly! 🚀"
+        "✅ Reset your account status\n"
+        "✅ Ready for fresh start\n\n"
+        "**Try these commands:**\n"
+        "📝 `/commit I want to get this finished`\n"
+        "📊 `/progress` - See your dashboard\n"
+        "❓ `/help` - Full command list\n\n"
+        "Everything should work perfectly now! 🚀"
     )
 
 @dp.message(lambda message: message.text and not message.text.startswith('/'))  # Only non-command messages
@@ -1675,29 +1697,30 @@ async def handle_text_messages(message: Message, state: FSMContext):
     
     # Continue with normal routing only if no FSM state
     
-    # First, check if user is in first impression flow (UNIFIED ROUTING)
-    onboarding_status = await onboarding_manager.get_user_onboarding_status(user_id)
+    # GRACEFUL APPROACH: Help users regardless of onboarding status
     
-    if onboarding_status == "new":
-        # User should be seeing first impression welcome - route to first goal
-        await state.set_state(FirstImpressionStates.waiting_for_first_goal)
-        await handle_first_goal_magic(message, state)
+    # Check if they might be trying to create a commitment
+    if len(message.text) > 10:
+        # This looks like a potential commitment
+        await message.answer(
+            f"That sounds like a great goal! 🎯\n\n"
+            f"**To save it as a commitment, use:**\n"
+            f"`/commit {message.text}`\n\n"
+            f"Then use `/done` when you complete it! 🚀"
+        )
         return
-    elif onboarding_status == "in_progress":
-        # User already created goal, they might be saying done or similar
-        if "done" in message.text.lower() or "finished" in message.text.lower() or "complete" in message.text.lower():
-            # Check if they should get celebration
-            should_celebrate = await first_impression.should_trigger_celebration(user_id)
-            if should_celebrate:
-                response = await first_impression.handle_first_completion_celebration(user_id, message.from_user.first_name or "there")
-                await message.answer(response, parse_mode="Markdown")
-                return
-        else:
-            # Not saying done - might be normal message
-            await message.answer("🎯 Great! When you complete your commitment, just say 'done' and I'll celebrate with you! 🎉")
-            return
     
-    # If onboarding_status == "completed", continue with normal flow
+    # Check for completion words
+    completion_words = ["done", "finished", "complete", "completed", "did it"]
+    if any(word in message.text.lower() for word in completion_words):
+        await message.answer(
+            "🎉 **Awesome!** \n\n"
+            "To mark a specific commitment as done:\n"
+            "• Use `/done` and I'll show you your active commitments\n"
+            "• Or use `/list` to see what you have pending\n\n"
+            "Keep up the great work! 💪"
+        )
+        return
     
     # Legacy onboarding system check (for existing users)
     needs_onboarding = await onboarding_system.check_user_needs_onboarding_data(user_id)
@@ -1743,12 +1766,15 @@ async def handle_text_messages(message: Message, state: FSMContext):
                 await message.answer(data_request, parse_mode="Markdown")
                 return
         
-        # Default response
+        # Graceful default response with helpful guidance
         await message.answer(
-            "I didn't understand that. Try:\n\n"
-            "/commit <your commitment> - Add a new commitment\n"
-            "/done - Mark commitments complete\n"
-            "/help - See all commands"
+            "I'm here to help you stay accountable! 🎯\n\n"
+            "**Quick Start:**\n"
+            "📝 `/commit <your goal>` - Save a commitment\n"
+            "✅ `/done` - Mark something complete\n"
+            "📊 `/progress` - See your wins\n"
+            "❓ `/help` - See all commands\n\n"
+            "What would you like to accomplish today?"
         )
 
 # Onboarding state handlers
