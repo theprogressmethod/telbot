@@ -14,8 +14,9 @@ logger = logging.getLogger(__name__)
 class OnboardingManager:
     """Unified onboarding state management - works with existing schema"""
     
-    def __init__(self, supabase_client: Client):
+    def __init__(self, supabase_client: Client, role_manager=None):
         self.supabase = supabase_client
+        self.role_manager = role_manager
     
     async def get_user_onboarding_status(self, telegram_user_id: int) -> str:
         """Get user's onboarding status - uses existing columns as proxy"""
@@ -86,35 +87,55 @@ class OnboardingManager:
         return status == "completed"
     
     async def start_onboarding(self, telegram_user_id: int, first_name: str = None, username: str = None) -> bool:
-        """Initialize user and start onboarding process - works with existing schema"""
+        """Initialize user and start onboarding process using centralized role manager"""
         try:
-            # Check if user exists (don't query non-existent onboarding_status column)
-            existing = self.supabase.table("users").select("id, first_bot_interaction_at").eq("telegram_user_id", telegram_user_id).execute()
-            
-            if not existing.data:
-                # Create new user - but don't set onboarding_status column that doesn't exist
-                user_data = {
-                    "telegram_user_id": telegram_user_id,
-                    "first_name": first_name or "User",
-                    "username": username,
-                    # Leave email null - users can provide it later for email features
-                    # Remove onboarding_status - doesn't exist in schema
-                    "first_bot_interaction_at": datetime.now().isoformat(),
-                    "last_activity_at": datetime.now().isoformat()
-                }
+            if self.role_manager:
+                # Use centralized user creation
+                success = await self.role_manager.ensure_user_exists(telegram_user_id, first_name, username)
+                if not success:
+                    logger.error(f"❌ Failed to create user {telegram_user_id} via role_manager")
+                    return False
                 
-                self.supabase.table("users").insert(user_data).execute()
-                logger.info(f"Created new user {telegram_user_id}")
+                # Ensure first_bot_interaction_at is set
+                try:
+                    existing = self.supabase.table("users").select("first_bot_interaction_at").eq("telegram_user_id", telegram_user_id).execute()
+                    if existing.data and not existing.data[0].get("first_bot_interaction_at"):
+                        self.supabase.table("users").update({
+                            "first_bot_interaction_at": datetime.now().isoformat()
+                        }).eq("telegram_user_id", telegram_user_id).execute()
+                        logger.info(f"✅ Set first_bot_interaction_at for user {telegram_user_id}")
+                except Exception as update_e:
+                    logger.warning(f"User created but couldn't update first_bot_interaction_at: {update_e}")
+                    
+                logger.info(f"✅ User {telegram_user_id} ready for onboarding via role_manager")
+                return True
                 
             else:
-                # Update existing user's activity
-                update_data = {
-                    "last_activity_at": datetime.now().isoformat()
-                }
+                # Fallback to legacy method
+                logger.warning("⚠️ role_manager not available, using legacy onboarding creation")
+                existing = self.supabase.table("users").select("id, first_bot_interaction_at").eq("telegram_user_id", telegram_user_id).execute()
                 
-                # Set first_bot_interaction_at if it's missing  
-                if not existing.data[0].get("first_bot_interaction_at"):
-                    update_data["first_bot_interaction_at"] = datetime.now().isoformat()
+                if not existing.data:
+                    user_data = {
+                        "telegram_user_id": telegram_user_id,
+                        "first_name": first_name or "User",
+                        "username": username,
+                        "first_bot_interaction_at": datetime.now().isoformat(),
+                        "last_activity_at": datetime.now().isoformat()
+                    }
+                    
+                    self.supabase.table("users").insert(user_data).execute()
+                    logger.info(f"Created new user {telegram_user_id} (legacy)")
+                    
+                else:
+                    # Update existing user's activity
+                    update_data = {
+                        "last_activity_at": datetime.now().isoformat()
+                    }
+                    
+                    # Set first_bot_interaction_at if it's missing  
+                    if not existing.data[0].get("first_bot_interaction_at"):
+                        update_data["first_bot_interaction_at"] = datetime.now().isoformat()
                 
                 self.supabase.table("users").update(update_data).eq("telegram_user_id", telegram_user_id).execute()
             

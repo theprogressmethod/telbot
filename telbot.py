@@ -447,8 +447,8 @@ pod_tracker = PodWeekTracker(supabase)
 # meet_tracker = AttendanceAdapter(supabase)  # Temporarily disabled
 nurture_system = NurtureSequences(supabase)
 onboarding_system = EnhancedUserOnboarding(supabase)
-onboarding_manager = OnboardingManager(supabase)
-first_impression = FirstImpressionExperience(supabase, openai_client, onboarding_manager)
+onboarding_manager = OnboardingManager(supabase, role_manager)
+first_impression = FirstImpressionExperience(supabase, openai_client, onboarding_manager, role_manager)
 
 # Temporary storage for callback data (use Redis in production)
 temp_storage = {}

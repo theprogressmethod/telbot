@@ -19,10 +19,11 @@ logger = logging.getLogger(__name__)
 class FirstImpressionExperience:
     """100x better first-time user experience - instant value, zero friction"""
     
-    def __init__(self, supabase_client: Client, openai_client, onboarding_manager=None):
+    def __init__(self, supabase_client: Client, openai_client, onboarding_manager=None, role_manager=None):
         self.supabase = supabase_client
         self.openai_client = openai_client
         self.onboarding_manager = onboarding_manager
+        self.role_manager = role_manager
     
     async def handle_zero_friction_onboarding(self, telegram_user_id: int, first_name: str, username: str) -> str:
         """Phase 1: Instant engagement with zero friction"""
@@ -244,23 +245,38 @@ Make it personal, inspiring, and believable. Avoid generic responses."""
             return False
     
     async def _silent_user_creation(self, telegram_user_id: int, first_name: str, username: str):
-        """Create user silently in background during onboarding"""
+        """Create user silently in background during onboarding using centralized role manager"""
         try:
-            # Check if user exists
-            existing = self.supabase.table("users").select("id").eq("telegram_user_id", telegram_user_id).execute()
-            
-            if not existing.data:
-                # Create user with first impression tracking
-                self.supabase.table("users").insert({
-                    "telegram_user_id": telegram_user_id,
-                    "first_name": first_name,
-                    "username": username,
-                    # Leave email null - users can provide it later for email features
-                    "status": "first_impression_flow",
-                    "created_at": datetime.now().isoformat(),
-                    "onboarding_started_at": datetime.now().isoformat()
-                }).execute()
+            if self.role_manager:
+                # Use centralized user creation with proper role assignment
+                success = await self.role_manager.ensure_user_exists(telegram_user_id, first_name, username)
+                if success:
+                    # Update with first impression tracking fields if needed
+                    try:
+                        self.supabase.table("users").update({
+                            "status": "first_impression_flow",
+                            "onboarding_started_at": datetime.now().isoformat()
+                        }).eq("telegram_user_id", telegram_user_id).execute()
+                        logger.info(f"✅ User {telegram_user_id} created via role_manager and marked for first impression flow")
+                    except Exception as update_e:
+                        logger.warning(f"User created but couldn't update first impression status: {update_e}")
+                else:
+                    logger.error(f"❌ Failed to create user {telegram_user_id} via role_manager")
+            else:
+                # Fallback to old method if role_manager not available
+                logger.warning("⚠️ role_manager not available, using legacy user creation")
+                existing = self.supabase.table("users").select("id").eq("telegram_user_id", telegram_user_id).execute()
                 
+                if not existing.data:
+                    self.supabase.table("users").insert({
+                        "telegram_user_id": telegram_user_id,
+                        "first_name": first_name,
+                        "username": username,
+                        "status": "first_impression_flow",
+                        "created_at": datetime.now().isoformat(),
+                        "onboarding_started_at": datetime.now().isoformat()
+                    }).execute()
+                    
         except Exception as e:
             logger.error(f"Error in silent user creation: {e}")
     
