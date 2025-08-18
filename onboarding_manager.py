@@ -97,7 +97,7 @@ class OnboardingManager:
                     "telegram_user_id": telegram_user_id,
                     "first_name": first_name or "User",
                     "username": username,
-                    "email": f"{telegram_user_id}@telegram.user",
+                    # Leave email null - users can provide it later for email features
                     # Remove onboarding_status - doesn't exist in schema
                     "first_bot_interaction_at": datetime.now().isoformat(),
                     "last_activity_at": datetime.now().isoformat()

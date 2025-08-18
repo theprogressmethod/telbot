@@ -255,7 +255,7 @@ Make it personal, inspiring, and believable. Avoid generic responses."""
                     "telegram_user_id": telegram_user_id,
                     "first_name": first_name,
                     "username": username,
-                    "email": f"{telegram_user_id}@telegram.user",  # Temporary email
+                    # Leave email null - users can provide it later for email features
                     "status": "first_impression_flow",
                     "created_at": datetime.now().isoformat(),
                     "onboarding_started_at": datetime.now().isoformat()
