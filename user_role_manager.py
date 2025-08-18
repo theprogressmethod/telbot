@@ -107,7 +107,11 @@ class UserRoleManager:
     
     async def ensure_user_exists(self, telegram_user_id: int, first_name: str = None, username: str = None) -> bool:
         """Ensure user exists in database and has default 'unpaid' role using atomic transaction"""
+        logger.info(f"🔍 USER_FLOW: ensure_user_exists called for user {telegram_user_id} (name: {first_name}, username: {username})")
+        
         try:
+            logger.debug(f"🔧 USER_FLOW: Attempting atomic user creation for {telegram_user_id}")
+            
             # Use atomic database function to prevent race conditions
             result = self.supabase.rpc('ensure_user_exists_atomic', {
                 'p_telegram_user_id': telegram_user_id,
@@ -115,37 +119,50 @@ class UserRoleManager:
                 'p_username': username
             }).execute()
             
+            logger.debug(f"🔧 USER_FLOW: RPC call completed for {telegram_user_id}, processing response...")
+            
             if result.data:
                 response = result.data
+                logger.debug(f"🔧 USER_FLOW: Response data for {telegram_user_id}: {response}")
+                
                 if response.get('success'):
                     if response.get('is_new_user'):
-                        logger.info(f"✅ Created new user: {telegram_user_id} (ID: {response.get('user_id')})")
+                        logger.info(f"✅ USER_FLOW: Created NEW user {telegram_user_id} (UUID: {response.get('user_id')}, Name: {first_name})")
                     else:
-                        logger.debug(f"✅ Updated existing user: {telegram_user_id}")
+                        logger.info(f"✅ USER_FLOW: Updated EXISTING user {telegram_user_id} activity timestamp")
+                    
+                    logger.info(f"🎯 USER_FLOW: ensure_user_exists SUCCESS for {telegram_user_id}")
                     return True
                 else:
-                    logger.error(f"❌ Database function failed: {response.get('error')}")
+                    error_msg = response.get('error', 'Unknown error')
+                    logger.error(f"❌ USER_FLOW: Database function FAILED for {telegram_user_id}: {error_msg}")
                     return False
             else:
-                logger.error(f"❌ No data returned from ensure_user_exists_atomic")
+                logger.error(f"❌ USER_FLOW: No data returned from ensure_user_exists_atomic for {telegram_user_id}")
                 return False
                 
         except Exception as e:
             # Fallback to old method if function doesn't exist yet
             if "Could not find the function" in str(e):
-                logger.warning(f"⚠️ Atomic function not available, falling back to legacy method for user {telegram_user_id}")
+                logger.warning(f"⚠️ USER_FLOW: Atomic function not available, falling back to LEGACY method for user {telegram_user_id}")
                 return await self._ensure_user_exists_legacy(telegram_user_id, first_name, username)
             else:
-                logger.error(f"❌ Error calling ensure_user_exists_atomic: {e}")
+                logger.error(f"❌ USER_FLOW: Error calling ensure_user_exists_atomic for {telegram_user_id}: {e}")
                 return False
 
     async def _ensure_user_exists_legacy(self, telegram_user_id: int, first_name: str = None, username: str = None) -> bool:
         """Legacy user creation method (kept as fallback)"""
+        logger.info(f"🔄 USER_FLOW: LEGACY ensure_user_exists started for user {telegram_user_id}")
+        
         try:
+            logger.debug(f"🔧 USER_FLOW: LEGACY checking if user {telegram_user_id} exists...")
+            
             # Check if user exists
             existing_user = self.supabase.table("users").select("id").eq("telegram_user_id", telegram_user_id).execute()
             
             if not existing_user.data:
+                logger.info(f"🆕 USER_FLOW: LEGACY user {telegram_user_id} does NOT exist, creating new user...")
+                
                 # Create new user
                 user_data = {
                     "telegram_user_id": telegram_user_id,
@@ -156,19 +173,36 @@ class UserRoleManager:
                     "last_activity_at": datetime.now().isoformat()
                 }
                 
+                logger.debug(f"🔧 USER_FLOW: LEGACY inserting user data for {telegram_user_id}: {user_data}")
                 user_result = self.supabase.table("users").insert(user_data).execute()
-                logger.info(f"Created new user (legacy): {telegram_user_id}")
                 
-                # Grant default 'unpaid' role
-                await self.grant_role(telegram_user_id, "unpaid")
+                if user_result.data:
+                    user_uuid = user_result.data[0]["id"]
+                    logger.info(f"✅ USER_FLOW: LEGACY created new user {telegram_user_id} (UUID: {user_uuid})")
+                    
+                    # Grant default 'unpaid' role
+                    logger.debug(f"🔧 USER_FLOW: LEGACY granting 'unpaid' role to user {telegram_user_id}")
+                    role_success = await self.grant_role(telegram_user_id, "unpaid")
+                    if role_success:
+                        logger.info(f"✅ USER_FLOW: LEGACY granted 'unpaid' role to user {telegram_user_id}")
+                    else:
+                        logger.error(f"❌ USER_FLOW: LEGACY failed to grant 'unpaid' role to user {telegram_user_id}")
+                else:
+                    logger.error(f"❌ USER_FLOW: LEGACY user insert failed for {telegram_user_id}")
+                    return False
                 
             else:
-                # Update last activity
                 user_id = existing_user.data[0]["id"]
-                self.supabase.table("users").update({
+                logger.info(f"♻️ USER_FLOW: LEGACY user {telegram_user_id} EXISTS (UUID: {user_id}), updating activity...")
+                
+                # Update last activity
+                update_result = self.supabase.table("users").update({
                     "last_activity_at": datetime.now().isoformat()
                 }).eq("id", user_id).execute()
+                
+                logger.debug(f"✅ USER_FLOW: LEGACY updated activity for user {telegram_user_id}")
             
+            logger.info(f"🎯 USER_FLOW: LEGACY ensure_user_exists SUCCESS for {telegram_user_id}")
             return True
             
         except Exception as e:

@@ -573,18 +573,34 @@ async def start_handler(message: Message, state: FSMContext):
     user_name = message.from_user.first_name or "there"
     username = message.from_user.username
     
+    logger.info(f"🚀 START_HANDLER: /start command received from user {user_id} (name: {user_name}, username: {username})")
+    
     # EMERGENCY FIX: Clear any stuck FSM state first
     await state.clear()
+    logger.debug(f"🔧 START_HANDLER: Cleared FSM state for user {user_id}")
     
     # Ensure user exists in database and get role info
-    await role_manager.ensure_user_exists(user_id, user_name, username)
+    logger.info(f"🔍 START_HANDLER: Ensuring user {user_id} exists in database...")
+    user_creation_success = await role_manager.ensure_user_exists(user_id, user_name, username)
+    
+    if not user_creation_success:
+        logger.error(f"❌ START_HANDLER: Failed to ensure user {user_id} exists - aborting /start")
+        await message.answer("❌ Sorry, there was an error setting up your account. Please try again later.")
+        return
+    
+    logger.info(f"✅ START_HANDLER: User {user_id} confirmed in database, proceeding with onboarding...")
     
     # Initialize onboarding system (replaces is_first_time_user check)
-    await onboarding_manager.start_onboarding(user_id, user_name, username)
+    onboarding_success = await onboarding_manager.start_onboarding(user_id, user_name, username)
+    if not onboarding_success:
+        logger.error(f"❌ START_HANDLER: Onboarding initialization failed for user {user_id}")
     
     # Check onboarding status using unified system  
+    logger.debug(f"🔧 START_HANDLER: Checking onboarding status for user {user_id}...")
     should_show_first_impression = await onboarding_manager.should_show_first_impression(user_id)
     user_roles = await role_manager.get_user_roles(user_id)
+    
+    logger.info(f"📊 START_HANDLER: User {user_id} status - First impression: {should_show_first_impression}, Roles: {user_roles}")
     
     # EMERGENCY FIX: Use the correct variable instead of undefined is_first_time
     is_first_time = should_show_first_impression
@@ -724,6 +740,7 @@ async def commit_handler(message: Message):
     # Now first-time users can make commitments immediately after /start
     
     # Ensure user exists in database with error handling
+    logger.info(f"🔍 COMMIT_HANDLER: Ensuring user {user_id} exists before processing commitment...")
     user_created = await role_manager.ensure_user_exists(
         user_id, 
         message.from_user.first_name,
@@ -731,8 +748,11 @@ async def commit_handler(message: Message):
     )
     
     if not user_created:
+        logger.error(f"❌ COMMIT_HANDLER: Failed to ensure user {user_id} exists - aborting commitment processing")
         await message.answer("❌ Error setting up user account. Please try /start first, then try your commitment again.")
         return
+    
+    logger.info(f"✅ COMMIT_HANDLER: User {user_id} confirmed in database, proceeding with commitment processing")
     
     # Test database before proceeding
     if not await DatabaseManager.test_database():
