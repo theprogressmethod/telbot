@@ -590,15 +590,21 @@ async def start_handler(message: Message, state: FSMContext):
     user_name = message.from_user.first_name or "there"
     username = message.from_user.username
     
+    # EMERGENCY FIX: Clear any stuck FSM state first
+    await state.clear()
+    
     # Ensure user exists in database and get role info
     await role_manager.ensure_user_exists(user_id, user_name, username)
     
     # Initialize onboarding system (replaces is_first_time_user check)
     await onboarding_manager.start_onboarding(user_id, user_name, username)
     
-    # Check onboarding status using unified system
+    # Check onboarding status using unified system  
     should_show_first_impression = await onboarding_manager.should_show_first_impression(user_id)
     user_roles = await role_manager.get_user_roles(user_id)
+    
+    # EMERGENCY FIX: Use the correct variable instead of undefined is_first_time
+    is_first_time = should_show_first_impression
     
     # Test database on first interaction
     db_test = await DatabaseManager.test_database()
@@ -655,16 +661,19 @@ I help people like you turn big dreams into daily wins.
     
     await message.answer(welcome_text, parse_mode="Markdown")
     
-    # Set FSM state for first-time users for 100x experience
-    if is_first_time:
-        await state.set_state(FirstImpressionStates.waiting_for_first_goal)
+    # EMERGENCY FIX: Disable first impression FSM state to avoid loops
+    # if is_first_time:
+    #     await state.set_state(FirstImpressionStates.waiting_for_first_goal)
     
     # Trigger nurture sequence for first-time users
     if is_first_time:
-        user_result = supabase.table("users").select("id").eq("telegram_user_id", user_id).execute()
-        if user_result.data:
-            user_uuid = user_result.data[0]["id"]
-            await nurture_system.check_triggers(user_uuid, "first_interaction")
+        try:
+            user_result = supabase.table("users").select("id").eq("telegram_user_id", user_id).execute()
+            if user_result.data:
+                user_uuid = user_result.data[0]["id"]
+                await nurture_system.check_triggers(user_uuid, "first_interaction")
+        except Exception as e:
+            logger.error(f"Error triggering nurture sequence: {e}")
     
     # Log user activity
     logger.info(f"👋 {'New' if is_first_time else 'Returning'} user: {user_name} ({user_id}) - Roles: {user_roles}")

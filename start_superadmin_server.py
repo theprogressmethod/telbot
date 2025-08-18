@@ -15,8 +15,9 @@ from dotenv import load_dotenv
 load_dotenv('.env.staging')
 
 # Import dashboard components  
-from retro_superadmin_dashboard import add_retro_superadmin_routes
+from retro_superadmin_dashboard import add_superadmin_routes
 from enhanced_admin_dashboard import add_business_intelligence_routes
+from essential_business_dashboard import add_business_metrics_routes
 
 print("🚀 Starting SuperAdmin Dashboard Server...")
 print("Environment:", os.getenv('ENVIRONMENT', 'development'))
@@ -49,8 +50,9 @@ async def root():
     }
 
 # Add dashboard routes
-add_retro_superadmin_routes(app)
+add_superadmin_routes(app)
 add_business_intelligence_routes(app)
+add_business_metrics_routes(app)
 
 if __name__ == "__main__":
     print("\n📊 SuperAdmin Dashboard Features:")
