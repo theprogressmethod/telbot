@@ -106,7 +106,41 @@ class UserRoleManager:
             return False
     
     async def ensure_user_exists(self, telegram_user_id: int, first_name: str = None, username: str = None) -> bool:
-        """Ensure user exists in database and has default 'unpaid' role"""
+        """Ensure user exists in database and has default 'unpaid' role using atomic transaction"""
+        try:
+            # Use atomic database function to prevent race conditions
+            result = self.supabase.rpc('ensure_user_exists_atomic', {
+                'p_telegram_user_id': telegram_user_id,
+                'p_first_name': first_name or "User",
+                'p_username': username
+            }).execute()
+            
+            if result.data:
+                response = result.data
+                if response.get('success'):
+                    if response.get('is_new_user'):
+                        logger.info(f"✅ Created new user: {telegram_user_id} (ID: {response.get('user_id')})")
+                    else:
+                        logger.debug(f"✅ Updated existing user: {telegram_user_id}")
+                    return True
+                else:
+                    logger.error(f"❌ Database function failed: {response.get('error')}")
+                    return False
+            else:
+                logger.error(f"❌ No data returned from ensure_user_exists_atomic")
+                return False
+                
+        except Exception as e:
+            # Fallback to old method if function doesn't exist yet
+            if "Could not find the function" in str(e):
+                logger.warning(f"⚠️ Atomic function not available, falling back to legacy method for user {telegram_user_id}")
+                return await self._ensure_user_exists_legacy(telegram_user_id, first_name, username)
+            else:
+                logger.error(f"❌ Error calling ensure_user_exists_atomic: {e}")
+                return False
+
+    async def _ensure_user_exists_legacy(self, telegram_user_id: int, first_name: str = None, username: str = None) -> bool:
+        """Legacy user creation method (kept as fallback)"""
         try:
             # Check if user exists
             existing_user = self.supabase.table("users").select("id").eq("telegram_user_id", telegram_user_id).execute()
@@ -123,7 +157,7 @@ class UserRoleManager:
                 }
                 
                 user_result = self.supabase.table("users").insert(user_data).execute()
-                logger.info(f"Created new user: {telegram_user_id}")
+                logger.info(f"Created new user (legacy): {telegram_user_id}")
                 
                 # Grant default 'unpaid' role
                 await self.grant_role(telegram_user_id, "unpaid")
@@ -150,7 +184,7 @@ class UserRoleManager:
                         self.supabase.table("users").update({
                             "last_activity_at": datetime.now().isoformat()
                         }).eq("id", user_id).execute()
-                        logger.info(f"✅ Verified user {telegram_user_id} exists and updated activity")
+                        logger.info(f"✅ Verified user {telegram_user_id} exists and updated activity (legacy)")
                         return True
                     else:
                         logger.error(f"❌ User {telegram_user_id} should exist after duplicate key error but not found")
@@ -159,7 +193,7 @@ class UserRoleManager:
                     logger.error(f"❌ Error verifying user after duplicate key: {verify_e}")
                     return False
             else:
-                logger.error(f"Error ensuring user exists: {e}")
+                logger.error(f"Error ensuring user exists (legacy): {e}")
                 return False
     
     async def is_first_time_user(self, telegram_user_id: int) -> bool:
