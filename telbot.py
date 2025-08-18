@@ -319,28 +319,10 @@ class DatabaseManager:
             user_result = supabase.table("users").select("id").eq("telegram_user_id", telegram_user_id).execute()
             
             if not user_result.data:
-                logger.warning(f"⚠️ User not found for telegram_user_id: {telegram_user_id}, attempting to create...")
-                # Attempt to create user (should not happen if ensure_user_exists was called)
-                try:
-                    user_data = {
-                        "telegram_user_id": telegram_user_id,
-                        "first_name": "Emergency User",
-                        "email": f"{telegram_user_id}@telegram.emergency",  # Required field
-                        "first_bot_interaction_at": datetime.now().isoformat(),
-                        "last_activity_at": datetime.now().isoformat()
-                    }
-                    create_result = supabase.table("users").insert(user_data).execute()
-                    if create_result.data:
-                        user_uuid = create_result.data[0]["id"]
-                        logger.info(f"✅ Emergency user creation successful: {user_uuid}")
-                    else:
-                        logger.error(f"❌ Emergency user creation failed")
-                        return False
-                except Exception as create_error:
-                    logger.error(f"❌ Emergency user creation error: {create_error}")
-                    return False
-            else:
-                user_uuid = user_result.data[0]["id"]
+                logger.error(f"❌ User not found for telegram_user_id: {telegram_user_id} - ensure_user_exists() should have been called first")
+                return False
+            
+            user_uuid = user_result.data[0]["id"]
             
             # Prepare data
             commitment_data = {
