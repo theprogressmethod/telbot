@@ -13,6 +13,7 @@ import os
 import json
 import logging
 from dotenv import load_dotenv
+from collections import deque
 from supabase import create_client
 from essential_business_dashboard import add_business_metrics_routes
 from nurture_control_dashboard import add_nurture_control_routes
@@ -21,9 +22,26 @@ from retro_superadmin_dashboard import add_superadmin_routes
 # Load environment
 load_dotenv()
 
-# Setup logging
+# Setup logging with in-memory storage for recent logs
+recent_logs = deque(maxlen=100)  # Store last 100 log entries
+
+class MemoryLogHandler(logging.Handler):
+    def emit(self, record):
+        log_entry = {
+            "timestamp": datetime.fromtimestamp(record.created).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": self.format(record)
+        }
+        recent_logs.append(log_entry)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Add memory handler to capture logs
+memory_handler = MemoryLogHandler()
+memory_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logging.getLogger().addHandler(memory_handler)
 
 try:
     from webhook_monitoring import add_webhook_monitoring_routes, track_webhook_request
@@ -58,10 +76,16 @@ api_key_header = APIKeyHeader(name="X-Admin-Key", auto_error=False)
 async def verify_admin(api_key: Optional[str] = Depends(api_key_header)):
     """Verify admin API key"""
     admin_key = os.getenv("ADMIN_API_KEY")
+    app_env = os.getenv("APP_ENV", "production")
+    allow_unprotected = os.getenv("ALLOW_UNPROTECTED_ADMIN", "false").lower() == "true"
+    
     if not admin_key:
-        # If no admin key is set, allow access (development mode)
-        logger.warning("⚠️ No ADMIN_API_KEY set - admin routes are unprotected!")
-        return True
+        if app_env == "development" and allow_unprotected:
+            logger.warning("⚠️ No ADMIN_API_KEY set - allowing unprotected access in development mode")
+            return True
+        else:
+            logger.error("❌ ADMIN_API_KEY not configured - denying access")
+            raise HTTPException(status_code=403, detail="Admin access required")
     
     if not api_key or api_key != admin_key:
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -1591,6 +1615,20 @@ async def create_pod(request: Request):
     except Exception as e:
         logger.error(f"Error creating pod: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/recent_logs")
+async def get_recent_logs(limit: int = 50):
+    """Get recent log entries for debugging"""
+    try:
+        # Convert deque to list and get last N entries
+        logs_list = list(recent_logs)
+        return {
+            "logs": logs_list[-limit:] if len(logs_list) > limit else logs_list,
+            "total_captured": len(logs_list),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {"error": str(e), "success": False}
 
 if __name__ == "__main__":
     import uvicorn
