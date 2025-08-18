@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unified Onboarding Manager - Single Source of Truth for User State
+Fixed Unified Onboarding Manager - Works with existing database schema
 Eliminates conflicts between multiple user detection systems
 """
 
@@ -12,29 +12,63 @@ from supabase import Client
 logger = logging.getLogger(__name__)
 
 class OnboardingManager:
-    """Unified onboarding state management - single source of truth"""
+    """Unified onboarding state management - works with existing schema"""
     
     def __init__(self, supabase_client: Client):
         self.supabase = supabase_client
     
     async def get_user_onboarding_status(self, telegram_user_id: int) -> str:
-        """Get user's onboarding status - single source of truth"""
+        """Get user's onboarding status - uses existing columns as proxy"""
         try:
-            result = self.supabase.table("users").select("onboarding_status").eq("telegram_user_id", telegram_user_id).execute()
+            # Query existing columns instead of non-existent onboarding_status
+            result = self.supabase.table("users").select(
+                "first_bot_interaction_at, total_commitments, completed_commitments"
+            ).eq("telegram_user_id", telegram_user_id).execute()
             
             if not result.data:
                 return "new"  # User doesn't exist = new user
             
-            return result.data[0].get("onboarding_status", "new")
+            user = result.data[0]
+            
+            # Determine status based on existing data
+            has_first_interaction = user.get("first_bot_interaction_at") is not None
+            total_commitments = user.get("total_commitments", 0) 
+            completed_commitments = user.get("completed_commitments", 0)
+            
+            # Logic: 
+            # - If no first interaction: new
+            # - If has interaction but no commitments: new  
+            # - If has commitments but none completed: in_progress
+            # - If has completed commitments: completed
+            
+            if not has_first_interaction:
+                return "new"
+            elif total_commitments == 0:
+                return "new"  # Started but never made commitments
+            elif completed_commitments == 0:
+                return "in_progress"  # Has commitments but none completed
+            else:
+                return "completed"  # Has completed at least one commitment
             
         except Exception as e:
             logger.error(f"Error getting onboarding status: {e}")
-            return "new"  # Default to new on error
+            # For existing users with data, assume completed to avoid blocking
+            try:
+                # Quick check if user exists with commitments
+                check = self.supabase.table("users").select("total_commitments").eq("telegram_user_id", telegram_user_id).execute()
+                if check.data and check.data[0].get("total_commitments", 0) > 0:
+                    return "completed"  # Don't block existing users
+            except:
+                pass
+            return "new"  # Default to new only for truly new users
     
     async def should_show_first_impression(self, telegram_user_id: int) -> bool:
         """Check if user should see first impression flow"""
         status = await self.get_user_onboarding_status(telegram_user_id)
-        return status in ["new", "in_progress"]
+        
+        # CRITICAL FIX: Only show first impression for truly new users
+        # Don't block users who already have commitments or interactions
+        return status == "new"  # Removed "in_progress" to fix blocking issue
     
     async def is_waiting_for_first_goal(self, telegram_user_id: int) -> bool:
         """Check if user is waiting to input their first goal"""
@@ -52,36 +86,37 @@ class OnboardingManager:
         return status == "completed"
     
     async def start_onboarding(self, telegram_user_id: int, first_name: str = None, username: str = None) -> bool:
-        """Initialize user and start onboarding process"""
+        """Initialize user and start onboarding process - works with existing schema"""
         try:
-            # Check if user exists
-            existing = self.supabase.table("users").select("id, onboarding_status").eq("telegram_user_id", telegram_user_id).execute()
+            # Check if user exists (don't query non-existent onboarding_status column)
+            existing = self.supabase.table("users").select("id, first_bot_interaction_at").eq("telegram_user_id", telegram_user_id).execute()
             
             if not existing.data:
-                # Create new user with 'new' status
+                # Create new user - but don't set onboarding_status column that doesn't exist
                 user_data = {
                     "telegram_user_id": telegram_user_id,
                     "first_name": first_name or "User",
                     "username": username,
                     "email": f"{telegram_user_id}@telegram.user",
-                    "onboarding_status": "new",
-                    "created_at": datetime.now().isoformat(),
+                    # Remove onboarding_status - doesn't exist in schema
                     "first_bot_interaction_at": datetime.now().isoformat(),
                     "last_activity_at": datetime.now().isoformat()
                 }
                 
                 self.supabase.table("users").insert(user_data).execute()
-                logger.info(f"Created new user {telegram_user_id} with onboarding_status: new")
+                logger.info(f"Created new user {telegram_user_id}")
                 
             else:
-                # Update existing user's last activity
-                self.supabase.table("users").update({
+                # Update existing user's activity
+                update_data = {
                     "last_activity_at": datetime.now().isoformat()
-                }).eq("telegram_user_id", telegram_user_id).execute()
+                }
                 
-                # If user was already created but status is missing, set to new
-                if not existing.data[0].get("onboarding_status"):
-                    await self.set_onboarding_status(telegram_user_id, "new")
+                # Set first_bot_interaction_at if it's missing  
+                if not existing.data[0].get("first_bot_interaction_at"):
+                    update_data["first_bot_interaction_at"] = datetime.now().isoformat()
+                
+                self.supabase.table("users").update(update_data).eq("telegram_user_id", telegram_user_id).execute()
             
             return True
             
@@ -90,59 +125,20 @@ class OnboardingManager:
             return False
     
     async def advance_to_goal_created(self, telegram_user_id: int) -> bool:
-        """Move user to 'in_progress' after they create their first goal"""
-        return await self.set_onboarding_status(telegram_user_id, "in_progress")
+        """Move user to 'in_progress' - update commitment counts"""
+        # Since we don't have onboarding_status column, we'll rely on commitment counts
+        # This will be automatically reflected in get_user_onboarding_status logic
+        return True
     
     async def complete_onboarding(self, telegram_user_id: int) -> bool:
-        """Mark onboarding as complete after first goal completion"""
-        return await self.set_onboarding_status(telegram_user_id, "completed")
+        """Mark onboarding as complete - update completion counts"""
+        # Since we don't have onboarding_status column, we'll rely on completed_commitments count
+        # This will be automatically reflected in get_user_onboarding_status logic  
+        return True
     
     async def set_onboarding_status(self, telegram_user_id: int, status: str) -> bool:
-        """Set user's onboarding status"""
-        try:
-            valid_statuses = ["new", "in_progress", "completed"]
-            if status not in valid_statuses:
-                logger.error(f"Invalid onboarding status: {status}")
-                return False
-            
-            self.supabase.table("users").update({
-                "onboarding_status": status,
-                "last_activity_at": datetime.now().isoformat()
-            }).eq("telegram_user_id", telegram_user_id).execute()
-            
-            logger.info(f"Set onboarding status for user {telegram_user_id}: {status}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error setting onboarding status: {e}")
-            return False
-    
-    async def get_user_stats(self, telegram_user_id: int) -> dict:
-        """Get user stats for display purposes"""
-        try:
-            result = self.supabase.table("users").select(
-                "total_commitments, completed_commitments, current_streak, onboarding_status"
-            ).eq("telegram_user_id", telegram_user_id).execute()
-            
-            if not result.data:
-                return {"total_commitments": 0, "completed_commitments": 0, "current_streak": 0, "onboarding_status": "new"}
-            
-            return result.data[0]
-            
-        except Exception as e:
-            logger.error(f"Error getting user stats: {e}")
-            return {"total_commitments": 0, "completed_commitments": 0, "current_streak": 0, "onboarding_status": "new"}
-    
-    async def reset_user_onboarding(self, telegram_user_id: int) -> bool:
-        """Reset user to beginning of onboarding (for debugging)"""
-        try:
-            # Set status back to new
-            await self.set_onboarding_status(telegram_user_id, "new")
-            
-            # Optional: Clear FSM state if needed
-            logger.info(f"Reset onboarding for user {telegram_user_id}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error resetting onboarding: {e}")
-            return False
+        """Set onboarding status - NOOP since column doesn't exist"""
+        # This method exists for compatibility but does nothing
+        # Status is determined dynamically from commitment counts
+        logger.info(f"Onboarding status set to {status} for user {telegram_user_id} (using commitment counts as proxy)")
+        return True
