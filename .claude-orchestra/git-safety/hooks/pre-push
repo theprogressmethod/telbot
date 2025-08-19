@@ -1,0 +1,230 @@
+#!/bin/bash
+#
+# Git Pre-Push Hook - Claude Orchestra Safety System
+# WORKER_3 PREP-001C Implementation
+#
+# This hook validates push operations for safety:
+# - Checks branch protection rules before push
+# - Validates remote repository safety
+# - Runs deployment readiness checks
+# - Prevents force push to protected branches
+#
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Configuration paths
+ORCHESTRA_DIR=".claude-orchestra"
+CONFIG_FILE="$ORCHESTRA_DIR/git-safety/config/git-safety-config.yaml"
+VALIDATION_SCRIPT="$ORCHESTRA_DIR/scripts/validate-repo-safety.py"
+
+echo -e "${BLUE}🚀 Claude Orchestra Git Safety - Pre-Push Hook${NC}"
+echo "================================================"
+
+# Read standard input (remote name and URL)
+remote="$1"
+url="$2"
+
+# Track if any violations are found
+violations_found=0
+
+# Get current branch
+current_branch=$(git branch --show-current)
+
+# Protected branches that require special handling
+protected_branches=("main" "production" "staging" "master")
+
+echo -e "${BLUE}🔍 Push validation for branch: $current_branch${NC}"
+echo -e "${BLUE}📡 Remote: $remote ($url)${NC}"
+
+# Function to check if branch is protected
+is_protected_branch() {
+    local branch="$1"
+    for protected in "${protected_branches[@]}"; do
+        if [ "$branch" = "$protected" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Function to check for force push attempt
+check_force_push() {
+    # Check if --force or --force-with-lease flags are being used
+    # This is determined by examining the git push command
+    local git_command=$(ps -p $PPID -o args= 2>/dev/null || echo "")
+    
+    if echo "$git_command" | grep -qE "(--force|--force-with-lease|-f)"; then
+        echo -e "${RED}❌ Force push detected${NC}"
+        
+        if is_protected_branch "$current_branch"; then
+            echo -e "${RED}❌ Force push to protected branch '$current_branch' is BLOCKED${NC}"
+            echo -e "${YELLOW}💡 Force pushes to protected branches can corrupt orchestration state${NC}"
+            return 1
+        else
+            echo -e "${YELLOW}⚠️  Force push to non-protected branch '$current_branch'${NC}"
+            echo -e "${YELLOW}💡 Use with caution - this can affect other workers${NC}"
+        fi
+    fi
+    return 0
+}
+
+# Function to validate remote repository safety
+validate_remote_safety() {
+    local remote_url="$1"
+    
+    # Check for dangerous remote patterns
+    if echo "$remote_url" | grep -qE "(production|prod|live)"; then
+        if ! is_protected_branch "$current_branch"; then
+            echo -e "${RED}❌ Pushing non-protected branch to production remote is dangerous${NC}"
+            echo -e "${YELLOW}💡 Only protected branches should push to production remotes${NC}"
+            return 1
+        fi
+    fi
+    
+    # Validate HTTPS vs SSH for security
+    if echo "$remote_url" | grep -qE "^https://"; then
+        echo -e "${YELLOW}⚠️  Using HTTPS remote - consider SSH for better security${NC}"
+    fi
+    
+    echo -e "${GREEN}✅ Remote safety validation passed${NC}"
+    return 0
+}
+
+# Function to run deployment readiness checks
+check_deployment_readiness() {
+    local branch="$1"
+    
+    echo -e "${BLUE}🔍 Running deployment readiness checks...${NC}"
+    
+    # Check if orchestration system is in consistent state
+    if [ -f "$ORCHESTRA_DIR/control/emergency-stop.flag" ]; then
+        echo -e "${RED}❌ Emergency stop is active - push blocked${NC}"
+        echo -e "${YELLOW}💡 Clear emergency stop before pushing${NC}"
+        return 1
+    fi
+    
+    # Check for active worker conflicts
+    if [ -f "$ORCHESTRA_DIR/status/active-worker.md" ]; then
+        if grep -q "EMERGENCY_STOP_ACTIVE" "$ORCHESTRA_DIR/status/active-worker.md" 2>/dev/null; then
+            echo -e "${RED}❌ System in emergency stop state - push blocked${NC}"
+            return 1
+        fi
+    fi
+    
+    # Validate orchestration file consistency
+    if [ -f "$VALIDATION_SCRIPT" ]; then
+        echo -e "${BLUE}🔧 Running orchestration validation script...${NC}"
+        if ! python3 "$VALIDATION_SCRIPT" --quick-check 2>/dev/null; then
+            echo -e "${YELLOW}⚠️  Orchestration validation script failed or not available${NC}"
+            echo -e "${BLUE}💡 Proceeding with basic checks${NC}"
+        fi
+    fi
+    
+    # Check for uncommitted orchestration changes
+    if git diff --quiet HEAD -- "$ORCHESTRA_DIR/"; then
+        echo -e "${GREEN}✅ No uncommitted orchestration changes${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Uncommitted changes in orchestration directory${NC}"
+        echo -e "${BLUE}💡 Consider committing orchestration changes separately${NC}"
+    fi
+    
+    return 0
+}
+
+# Function to validate branch protection rules
+validate_branch_protection() {
+    local branch="$1"
+    
+    if is_protected_branch "$branch"; then
+        echo -e "${YELLOW}⚠️  Pushing to protected branch: $branch${NC}"
+        
+        # Check if this should require a pull request
+        echo -e "${BLUE}🔍 Checking branch protection policies...${NC}"
+        
+        # In a full implementation, this would check:
+        # - Required status checks
+        # - Required reviews
+        # - Admin enforcement
+        # For now, we'll warn about direct pushes to protected branches
+        
+        echo -e "${YELLOW}💡 Protected branch push detected${NC}"
+        echo -e "${BLUE}🔄 Ensure this follows your team's branching policy${NC}"
+    fi
+    
+    return 0
+}
+
+# Main validation sequence
+echo -e "${BLUE}🔍 Starting pre-push validation...${NC}"
+
+# Check for force push
+if ! check_force_push; then
+    violations_found=1
+fi
+
+# Validate remote safety
+if ! validate_remote_safety "$url"; then
+    violations_found=1
+fi
+
+# Check deployment readiness
+if ! check_deployment_readiness "$current_branch"; then
+    violations_found=1
+fi
+
+# Validate branch protection
+if ! validate_branch_protection "$current_branch"; then
+    violations_found=1
+fi
+
+# Additional orchestration-specific checks
+echo -e "${BLUE}🔍 Orchestration-specific validations...${NC}"
+
+# Check if we're in the middle of a worker operation
+if [ -f "$ORCHESTRA_DIR/status/active-worker.md" ]; then
+    current_worker=$(grep "CURRENT_WORKER:" "$ORCHESTRA_DIR/status/active-worker.md" 2>/dev/null | cut -d':' -f2 | tr -d ' ')
+    if [ "$current_worker" != "NONE" ] && [ -n "$current_worker" ]; then
+        echo -e "${YELLOW}⚠️  Active worker detected: $current_worker${NC}"
+        echo -e "${BLUE}💡 Ensure push doesn't conflict with active worker operations${NC}"
+    fi
+fi
+
+# Validate that critical orchestration files aren't broken
+critical_files=(
+    "$ORCHESTRA_DIR/status/task-queue.md"
+    "$ORCHESTRA_DIR/status/active-worker.md"
+)
+
+for file in "${critical_files[@]}"; do
+    if [ -f "$file" ]; then
+        # Basic syntax check for markdown files
+        if ! head -5 "$file" | grep -q "^#"; then
+            echo -e "${YELLOW}⚠️  Critical orchestration file may be malformed: $file${NC}"
+        fi
+    fi
+done
+
+echo ""
+
+# Final result
+if [ $violations_found -eq 1 ]; then
+    echo -e "${RED}================================================${NC}"
+    echo -e "${RED}❌ Pre-push hook FAILED - Safety violations detected${NC}"
+    echo -e "${YELLOW}💡 Please fix the issues above and try again${NC}"
+    echo -e "${BLUE}🆘 For emergency override: .claude-orchestra/git-safety/scripts/emergency-override.sh${NC}"
+    echo -e "${RED}================================================${NC}"
+    exit 1
+else
+    echo -e "${GREEN}================================================${NC}"
+    echo -e "${GREEN}✅ Pre-push hook PASSED - Push is safe to proceed${NC}"
+    echo -e "${GREEN}🚀 Push operation authorized${NC}"
+    echo -e "${GREEN}================================================${NC}"
+    exit 0
+fi

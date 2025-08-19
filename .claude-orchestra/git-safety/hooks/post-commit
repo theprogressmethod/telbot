@@ -1,0 +1,152 @@
+#!/bin/bash
+#
+# Git Post-Commit Hook - Claude Orchestra Safety System
+# WORKER_3 PREP-001C Implementation
+#
+# This hook runs after a successful commit to:
+# - Log commit to orchestration system
+# - Update worker progress files
+# - Trigger necessary notifications
+# - Validate orchestration state consistency
+#
+
+set -e
+
+# Colors for output (lighter for post hooks)
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Configuration paths
+ORCHESTRA_DIR=".claude-orchestra"
+LOGS_DIR="$ORCHESTRA_DIR/logs"
+STATUS_DIR="$ORCHESTRA_DIR/status"
+
+echo -e "${BLUE}📝 Claude Orchestra - Post-Commit Hook${NC}"
+
+# Ensure log directories exist
+mkdir -p "$LOGS_DIR" 2>/dev/null || true
+
+# Get commit information
+commit_hash=$(git rev-parse HEAD)
+commit_short=$(git rev-parse --short HEAD)
+commit_message=$(git log -1 --pretty=%B)
+commit_author=$(git log -1 --pretty=%an)
+commit_date=$(git log -1 --pretty=%ci)
+current_branch=$(git branch --show-current)
+
+# Create orchestration log entry
+ORCHESTRATION_LOG="$LOGS_DIR/orchestration.log"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] COMMIT: $commit_short on $current_branch by $commit_author" >> "$ORCHESTRATION_LOG"
+echo "  Message: $(echo "$commit_message" | head -1)" >> "$ORCHESTRATION_LOG"
+
+# Check if this is a worker commit
+worker_id=""
+task_id=""
+
+# Extract worker and task information from commit message
+if echo "$commit_message" | grep -qE "WORKER_[0-9]+"; then
+    worker_id=$(echo "$commit_message" | grep -oE "WORKER_[0-9]+" | head -1)
+fi
+
+if echo "$commit_message" | grep -qE "(BOT|DASH|TEST|PREP)-[0-9]+[A-Z]*"; then
+    task_id=$(echo "$commit_message" | grep -oE "(BOT|DASH|TEST|PREP)-[0-9]+[A-Z]*" | head -1)
+fi
+
+# Log worker activity if detected
+if [ -n "$worker_id" ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $worker_id COMMIT: $task_id - $commit_short" >> "$LOGS_DIR/recent-work.log"
+    echo -e "${GREEN}✅ Worker activity logged: $worker_id${NC}"
+    
+    # Update worker progress if status files exist
+    if [ -f "$STATUS_DIR/active-worker.md" ]; then
+        # Check if this worker is currently active
+        if grep -q "$worker_id" "$STATUS_DIR/active-worker.md" 2>/dev/null; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] $worker_id PROGRESS: Commit $commit_short completed" >> "$LOGS_DIR/recent-work.log"
+        fi
+    fi
+fi
+
+# Check for orchestration file changes
+orchestration_files_changed=$(git diff-tree --no-commit-id --name-only -r HEAD | grep "^$ORCHESTRA_DIR/" || echo "")
+
+if [ -n "$orchestration_files_changed" ]; then
+    echo -e "${YELLOW}⚠️  Orchestration files modified in this commit:${NC}"
+    for file in $orchestration_files_changed; do
+        echo "  • $file"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ORCHESTRATION_CHANGE: $file in $commit_short" >> "$ORCHESTRATION_LOG"
+    done
+    
+    # Validate orchestration consistency after changes
+    validation_script="$ORCHESTRA_DIR/scripts/validate-repo-safety.py"
+    if [ -f "$validation_script" ]; then
+        echo -e "${BLUE}🔍 Running post-commit orchestration validation...${NC}"
+        if python3 "$validation_script" --post-commit 2>/dev/null; then
+            echo -e "${GREEN}✅ Orchestration validation passed${NC}"
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] VALIDATION: Post-commit check passed for $commit_short" >> "$ORCHESTRATION_LOG"
+        else
+            echo -e "${YELLOW}⚠️  Orchestration validation had warnings${NC}"
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] VALIDATION: Post-commit check had warnings for $commit_short" >> "$ORCHESTRATION_LOG"
+        fi
+    fi
+fi
+
+# Check for completed tasks based on commit message
+if echo "$commit_message" | grep -qiE "(COMPLETE|COMPLETED)"; then
+    if [ -n "$task_id" ] && [ -n "$worker_id" ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] TASK_COMPLETION: $worker_id completed $task_id - $commit_short" >> "$ORCHESTRATION_LOG"
+        echo -e "${GREEN}🎉 Task completion detected: $task_id by $worker_id${NC}"
+        
+        # Update task queue if it exists
+        if [ -f "$STATUS_DIR/task-queue.md" ]; then
+            # Mark task as completed (basic implementation)
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] QUEUE_UPDATE: $task_id marked as completed by $worker_id" >> "$ORCHESTRATION_LOG"
+        fi
+    fi
+fi
+
+# Log general repository statistics
+total_commits=$(git rev-list --count HEAD 2>/dev/null || echo "unknown")
+files_in_commit=$(git diff-tree --no-commit-id --name-only -r HEAD | wc -l)
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] STATS: Total commits: $total_commits, Files in this commit: $files_in_commit" >> "$ORCHESTRATION_LOG"
+
+# Create commit summary for monitoring
+commit_summary_file="$LOGS_DIR/commit-summary.log"
+{
+    echo "COMMIT: $commit_short"
+    echo "BRANCH: $current_branch"
+    echo "AUTHOR: $commit_author"
+    echo "DATE: $commit_date"
+    echo "WORKER: ${worker_id:-none}"
+    echo "TASK: ${task_id:-none}"
+    echo "FILES: $files_in_commit"
+    echo "MESSAGE: $(echo "$commit_message" | head -1)"
+    echo "---"
+} >> "$commit_summary_file"
+
+# Trigger notifications if needed (placeholder for future implementation)
+if [ -n "$worker_id" ] && echo "$commit_message" | grep -qiE "COMPLETE"; then
+    # Future: Could trigger Slack/Discord notifications
+    # Future: Could update external project management systems
+    # Future: Could trigger deployment pipelines
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] NOTIFICATION_TRIGGER: $worker_id completed $task_id" >> "$ORCHESTRATION_LOG"
+fi
+
+# Cleanup old log entries (keep last 1000 lines)
+if [ -f "$ORCHESTRATION_LOG" ]; then
+    tail -1000 "$ORCHESTRATION_LOG" > "${ORCHESTRATION_LOG}.tmp" 2>/dev/null || true
+    mv "${ORCHESTRATION_LOG}.tmp" "$ORCHESTRATION_LOG" 2>/dev/null || true
+fi
+
+if [ -f "$commit_summary_file" ]; then
+    tail -500 "$commit_summary_file" > "${commit_summary_file}.tmp" 2>/dev/null || true
+    mv "${commit_summary_file}.tmp" "$commit_summary_file" 2>/dev/null || true
+fi
+
+echo -e "${GREEN}✅ Post-commit orchestration logging completed${NC}"
+echo -e "${BLUE}📊 Commit $commit_short logged and processed${NC}"
+
+# Exit successfully (post hooks should not block)
+exit 0

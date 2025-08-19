@@ -1,0 +1,59 @@
+{
+  "name": "Claude Orchestra Workflow Template",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "# Claude Orchestra Integration\n\nThis template provides the foundation for integrating n8n workflows with the Claude Orchestra system.\n\n## Available Triggers\n- Task completion events\n- Worker status changes \n- Phase transitions\n- Error conditions\n\n## Common Actions\n- Update worker assignments\n- Send notifications\n- Log orchestration events\n- Update status dashboards",
+        "height": 464,
+        "width": 863
+      },
+      "id": "template-note",
+      "name": "Template Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [380, 240],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "triggerOn": "specificFolder",
+        "folder": ".claude-orchestra/logs/"
+      },
+      "id": "log-watcher",
+      "name": "Orchestra Log Watcher",
+      "type": "n8n-nodes-base.filesTrigger",
+      "position": [620, 380],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:3000/orchestra/webhook",
+        "httpMethod": "POST",
+        "responseMode": "responseData"
+      },
+      "id": "webhook-action",
+      "name": "Orchestra Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [840, 380], 
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Orchestra Log Watcher": {
+      "main": [
+        [
+          {
+            "node": "Orchestra Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "templateCreatedBy": "WORKER_1",
+    "templateVersion": "1.0.0",
+    "phase": "PHASE_0_PREP",
+    "description": "Foundation template for Claude Orchestra workflow integration"
+  }
+}

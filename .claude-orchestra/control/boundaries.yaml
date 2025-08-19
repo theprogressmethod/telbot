@@ -1,0 +1,120 @@
+# WORKER BOUNDARIES CONFIGURATION
+# Defines what each worker can and cannot access
+
+WORKER_1:
+  name: "Bot Developer"
+  id: "WORKER_1"
+  specialization: "Telegram Bot Development"
+  allowed_branches:
+    - "development"
+    - "feature/bot-*"
+  allowed_paths:
+    - "telbot.py"
+    - "main.py"
+    - "application_handler.py"
+    - "api/bot_handlers.py"
+    - "api/webhook.py"
+    - "automatic_attendance_engine.py"
+    - "google_meet_tracker.py"
+    - "pod_week_tracker.py"
+    - "recurring_meetings.py"
+    - "requirements.txt"
+  forbidden_paths:
+    - ".claude-orchestra/**"
+    - ".env.production"
+    - ".env.staging"
+    - "templates/**"
+    - "web_interface.py"
+    - "nurture_dashboard_*.py"
+    - "stakeholder_dashboards.py"
+    - "system_monitor_dashboard.py"
+    - "tests/**"
+    - "analysis/**"
+  allowed_operations:
+    - "read"
+    - "write" 
+    - "commit"
+  forbidden_operations:
+    - "deploy"
+    - "merge_to_main"
+    - "production_access"
+
+WORKER_2:
+  name: "Dashboard Developer"  
+  id: "WORKER_2"
+  specialization: "Web Interface Development"
+  allowed_branches:
+    - "development"
+    - "feature/dash-*"
+  allowed_paths:
+    - "templates/**"
+    - "web_interface.py"
+    - "nurture_dashboard_*.py" 
+    - "stakeholder_dashboards.py"
+    - "system_monitor_dashboard.py"
+    - "user_analytics.py"
+    - "leaderboard.py"
+    - "communication_admin_dashboard.py"
+  forbidden_paths:
+    - ".claude-orchestra/**"
+    - ".env.production"
+    - ".env.staging"
+    - "telbot.py"
+    - "main.py"
+    - "api/**"
+  allowed_operations:
+    - "read"
+    - "write"
+    - "commit"
+  forbidden_operations:
+    - "deploy"
+    - "merge_to_main" 
+    - "production_access"
+
+WORKER_3:
+  name: "Test Builder"
+  id: "WORKER_3" 
+  specialization: "Testing & Quality Assurance"
+  allowed_branches:
+    - "development"
+    - "feature/test-*"
+  allowed_paths:
+    - "tests/**"
+    - "test_*.py"
+    - "comprehensive_test_report.py"
+    - ".env.test"
+  forbidden_paths:
+    - ".claude-orchestra/**"
+    - ".env.production"
+    - ".env.staging"
+    - "main.py"
+    - "telbot.py"
+    - "templates/**"
+  allowed_operations:
+    - "read"
+    - "write"
+    - "commit" 
+    - "run_tests"
+  forbidden_operations:
+    - "deploy"
+    - "merge_to_main"
+    - "production_access"
+
+# Global restrictions for all workers
+GLOBAL_RESTRICTIONS:
+  never_touch:
+    - ".claude-orchestra/**"
+    - ".env.production"
+    - ".env.staging"
+    - "*.key"
+    - "*.pem"
+    - "google-meet-service-account.json"
+  emergency_stop_triggers:
+    - "production_deploy"
+    - "staging_deploy"
+    - "delete_database"
+    - "rm -rf"
+  phase_restrictions:
+    PHASE_1_DEVELOPMENT:
+      allowed_environments: ["development"]
+      forbidden_operations: ["deploy", "production_access", "staging_access"]
