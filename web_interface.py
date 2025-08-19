@@ -4,9 +4,11 @@ Attendance System Web Interface
 Locally hosted webpage to test all attendance features
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
 import asyncio
 import json
+import secrets
+import uuid
 from datetime import datetime, timedelta
 from telbot import Config
 from supabase import create_client
@@ -27,7 +29,8 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = 'attendance-system-dev-key'
+app.secret_key = secrets.token_hex(32)  # Generate secure secret key
+app.permanent_session_lifetime = timedelta(hours=24)  # Sessions expire after 24 hours
 
 # Global variables for our systems
 config = None
@@ -75,12 +78,233 @@ def initialize_systems():
         logger.error(f"❌ Failed to initialize systems: {e}")
         return False
 
+# Authentication and Session Management
+class AuthenticationManager:
+    """Handles user authentication and session management"""
+    
+    @staticmethod
+    def generate_auth_token():
+        """Generate a secure authentication token"""
+        return secrets.token_urlsafe(32)
+    
+    @staticmethod
+    def create_session_for_user(telegram_user_id: int, user_data: dict):
+        """Create a secure session for authenticated user"""
+        session.permanent = True
+        session['user_id'] = user_data['id']
+        session['telegram_user_id'] = telegram_user_id
+        session['username'] = user_data.get('username', '')
+        session['name'] = user_data.get('name', '')
+        session['email'] = user_data.get('email', '')
+        session['roles'] = user_data.get('roles', [])
+        session['authenticated'] = True
+        session['auth_token'] = AuthenticationManager.generate_auth_token()
+        session['login_time'] = datetime.now().isoformat()
+        
+        # Store session in database for tracking
+        try:
+            session_data = {
+                'id': str(uuid.uuid4()),
+                'user_id': user_data['id'],
+                'telegram_user_id': telegram_user_id,
+                'auth_token': session['auth_token'],
+                'login_time': session['login_time'],
+                'expires_at': (datetime.now() + timedelta(hours=24)).isoformat(),
+                'user_agent': request.headers.get('User-Agent', ''),
+                'ip_address': request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR'))
+            }
+            
+            supabase.table('user_sessions').insert(session_data).execute()
+            logger.info(f"✅ Created session for user {telegram_user_id}")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to store session in database: {e}")
+    
+    @staticmethod
+    def get_current_user():
+        """Get current authenticated user data from session"""
+        if not session.get('authenticated'):
+            return None
+            
+        return {
+            'user_id': session.get('user_id'),
+            'telegram_user_id': session.get('telegram_user_id'),
+            'username': session.get('username'),
+            'name': session.get('name'),
+            'email': session.get('email'),
+            'roles': session.get('roles', []),
+            'auth_token': session.get('auth_token'),
+            'login_time': session.get('login_time')
+        }
+    
+    @staticmethod
+    def user_has_role(role: str):
+        """Check if current user has specific role"""
+        user = AuthenticationManager.get_current_user()
+        if not user:
+            return False
+        return role in user.get('roles', [])
+    
+    @staticmethod
+    def user_has_any_role(roles: list):
+        """Check if current user has any of the specified roles"""
+        return any(AuthenticationManager.user_has_role(role) for role in roles)
+    
+    @staticmethod
+    def logout_user():
+        """Log out current user and cleanup session"""
+        try:
+            # Remove session from database
+            if session.get('auth_token'):
+                supabase.table('user_sessions').delete().eq('auth_token', session['auth_token']).execute()
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to remove session from database: {e}")
+        
+        # Clear Flask session
+        session.clear()
+        logger.info("✅ User logged out successfully")
+
+def require_auth(f):
+    """Decorator to require authentication for routes"""
+    from functools import wraps
+    
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not AuthenticationManager.get_current_user():
+            return redirect(url_for('login_page'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def require_role(required_role):
+    """Decorator to require specific role for routes"""
+    def decorator(f):
+        from functools import wraps
+        
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            user = AuthenticationManager.get_current_user()
+            if not user:
+                return redirect(url_for('login_page'))
+            if not AuthenticationManager.user_has_role(required_role):
+                flash(f'Access denied. Required role: {required_role}', 'error')
+                return redirect(url_for('dashboard'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+@app.route('/login')
+def login_page():
+    """Display login page with Telegram authentication"""
+    return render_template('login.html')
+
+@app.route('/api/telegram-auth', methods=['POST'])
+def telegram_auth():
+    """Handle Telegram authentication via bot-generated tokens"""
+    try:
+        data = request.json
+        telegram_user_id = data.get('telegram_user_id')
+        auth_code = data.get('auth_code')
+        
+        if not telegram_user_id or not auth_code:
+            return jsonify({
+                'status': 'error',
+                'message': 'telegram_user_id and auth_code are required'
+            }), 400
+        
+        # Verify auth code from temporary storage (should be generated by bot)
+        temp_auth_result = supabase.table('temp_auth_codes').select('*').eq('telegram_user_id', telegram_user_id).eq('auth_code', auth_code).execute()
+        
+        if not temp_auth_result.data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid or expired authentication code'
+            }), 401
+        
+        auth_record = temp_auth_result.data[0]
+        
+        # Check if code is still valid (within 10 minutes)
+        code_created = datetime.fromisoformat(auth_record['created_at'].replace('Z', '+00:00'))
+        if datetime.now() - code_created.replace(tzinfo=None) > timedelta(minutes=10):
+            # Clean up expired code
+            supabase.table('temp_auth_codes').delete().eq('id', auth_record['id']).execute()
+            return jsonify({
+                'status': 'error',
+                'message': 'Authentication code expired'
+            }), 401
+        
+        # Get user data from main users table
+        user_result = supabase.table('users').select('*').eq('telegram_user_id', telegram_user_id).execute()
+        
+        if not user_result.data:
+            return jsonify({
+                'status': 'error',
+                'message': 'User not found'
+            }), 404
+        
+        user_data = user_result.data[0]
+        
+        # Get user roles
+        roles_result = supabase.table('user_roles').select('role').eq('user_id', user_data['id']).execute()
+        user_roles = [role['role'] for role in roles_result.data] if roles_result.data else []
+        user_data['roles'] = user_roles
+        
+        # Create session
+        AuthenticationManager.create_session_for_user(telegram_user_id, user_data)
+        
+        # Clean up auth code
+        supabase.table('temp_auth_codes').delete().eq('id', auth_record['id']).execute()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Authentication successful',
+            'user': {
+                'name': user_data.get('name'),
+                'username': user_data.get('username'),
+                'roles': user_roles
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Authentication failed: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Authentication failed'
+        }), 500
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    """Log out current user"""
+    AuthenticationManager.logout_user()
+    return jsonify({
+        'status': 'success',
+        'message': 'Logged out successfully'
+    })
+
+@app.route('/api/user-info')
+def get_user_info():
+    """Get current user information"""
+    user = AuthenticationManager.get_current_user()
+    if not user:
+        return jsonify({
+            'status': 'error',
+            'message': 'Not authenticated'
+        }), 401
+        
+    return jsonify({
+        'status': 'success',
+        'user': user
+    })
+
 @app.route('/')
+@require_auth
 def dashboard():
     """Main dashboard showing system overview"""
-    return render_template('dashboard.html')
+    user = AuthenticationManager.get_current_user()
+    return render_template('dashboard.html', user=user)
 
 @app.route('/api/system-status')
+@require_auth
 def system_status():
     """Get current system status"""
     try:
@@ -110,6 +334,7 @@ def system_status():
         }), 500
 
 @app.route('/api/pods')
+@require_auth
 def get_pods():
     """Get all pods"""
     try:
@@ -352,11 +577,13 @@ def get_meeting_attendance(meeting_id):
         }), 500
 
 @app.route('/test')
+@require_auth
 def test_page():
     """Test page with all functionality"""
     return render_template('test.html')
 
 @app.route('/analytics')
+@require_auth
 def analytics_page():
     """Analytics dashboard"""
     return render_template('analytics.html')
@@ -773,6 +1000,7 @@ def sync_meet_session(session_id):
         }), 500
 
 @app.route('/automatic-attendance')
+@require_role('admin')
 def automatic_attendance_page():
     """Automatic attendance management page"""
     return render_template('automatic_attendance.html')

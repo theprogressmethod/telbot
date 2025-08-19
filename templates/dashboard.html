@@ -22,7 +22,42 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 2rem;
+            position: relative;
+        }
+        
+        .user-info {
+            position: absolute;
+            top: 1rem;
+            right: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .user-info span {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .header-content {
             text-align: center;
+            margin-top: 1rem;
         }
         
         .header h1 {
@@ -174,8 +209,20 @@
 </head>
 <body>
     <div class="header">
-        <h1>🎯 Attendance System Dashboard</h1>
-        <p>The Progress Method - Automated Pod Attendance Tracking</p>
+        <div class="user-info">
+            {% if user %}
+                <span>👤 {{ user.name or user.username }}</span>
+                {% if user.roles %}
+                    <span>🎭 {{ user.roles|join(', ') }}</span>
+                {% endif %}
+                <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+            {% endif %}
+        </div>
+        
+        <div class="header-content">
+            <h1>🎯 Attendance System Dashboard</h1>
+            <p>The Progress Method - Automated Pod Attendance Tracking</p>
+        </div>
     </div>
     
     <div class="container">
@@ -309,6 +356,29 @@
         
         function exportData() {
             alert('Data export functionality would be implemented here. This could export attendance data as CSV/JSON.');
+        }
+        
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/login';
+                } else {
+                    console.error('Logout failed');
+                    // Fallback - redirect anyway
+                    window.location.href = '/login';
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                // Fallback - redirect to login
+                window.location.href = '/login';
+            }
         }
         
         // Load system status when page loads
