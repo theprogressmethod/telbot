@@ -21,6 +21,7 @@ from recurring_meetings import (
 )
 from google_calendar_attendance import GoogleCalendarAttendance
 from automatic_attendance_engine import AutomaticAttendanceEngine
+from user_analytics import UserAnalytics
 import logging
 
 # Set up logging
@@ -39,10 +40,11 @@ attendance_system = None
 recurring_manager = None
 google_calendar = None
 automatic_attendance = None
+user_analytics = None
 
 def initialize_systems():
     """Initialize all our systems"""
-    global config, supabase, attendance_system, recurring_manager, google_calendar, automatic_attendance
+    global config, supabase, attendance_system, recurring_manager, google_calendar, automatic_attendance, user_analytics
     
     try:
         config = Config()
@@ -71,6 +73,14 @@ def initialize_systems():
         except Exception as e:
             logger.warning(f"⚠️ Automatic attendance engine failed to create: {e}")
             automatic_attendance = None
+        
+        # Initialize user analytics system
+        try:
+            user_analytics = UserAnalytics(supabase)
+            logger.info("✅ User analytics system initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ User analytics system failed to initialize: {e}")
+            user_analytics = None
         
         logger.info("✅ All systems initialized successfully")
         return True
@@ -296,10 +306,179 @@ def get_user_info():
         'user': user
     })
 
+@app.route('/user-dashboard')
+@require_auth
+def user_dashboard():
+    """User's personal progress dashboard"""
+    user = AuthenticationManager.get_current_user()
+    return render_template('user_dashboard.html', user=user)
+
+@app.route('/api/user-stats')
+@require_auth
+def get_user_stats():
+    """Get comprehensive user statistics for the dashboard"""
+    try:
+        user = AuthenticationManager.get_current_user()
+        if not user or not user_analytics:
+            return jsonify({
+                'status': 'error',
+                'message': 'Analytics system not available'
+            }), 500
+        
+        # Run async function in event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        stats = loop.run_until_complete(
+            user_analytics.get_user_stats(user['telegram_user_id'])
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'stats': stats
+        })
+    except Exception as e:
+        logger.error(f"❌ Error getting user stats: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to load user statistics'
+        }), 500
+
+@app.route('/api/user-commitments')
+@require_auth
+def get_user_commitments():
+    """Get user's recent commitments"""
+    try:
+        user = AuthenticationManager.get_current_user()
+        if not user:
+            return jsonify({
+                'status': 'error',
+                'message': 'Not authenticated'
+            }), 401
+        
+        # Get user's commitments from database
+        commitments_result = supabase.table('commitments').select('*').eq('user_id', user['user_id']).order('created_at', desc=True).limit(20).execute()
+        
+        commitments = []
+        for c in commitments_result.data:
+            commitments.append({
+                'id': c['id'],
+                'commitment_text': c['commitment_text'],
+                'status': c.get('status', 'active'),
+                'smart_score': c.get('smart_score'),
+                'category': c.get('category'),
+                'created_at': c['created_at'],
+                'due_date': c.get('due_date'),
+                'completed_at': c.get('completed_at')
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'commitments': commitments
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting user commitments: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to load commitments'
+        }), 500
+
+@app.route('/api/user-achievements')
+@require_auth
+def get_user_achievements():
+    """Get user's achievements"""
+    try:
+        user = AuthenticationManager.get_current_user()
+        if not user or not user_analytics:
+            return jsonify({
+                'status': 'error',
+                'message': 'Analytics system not available'
+            }), 500
+        
+        # Run async function in event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        achievements = loop.run_until_complete(
+            user_analytics._get_user_achievements(user['user_id'])
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'achievements': achievements
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting user achievements: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to load achievements'
+        }), 500
+
+@app.route('/leaderboard')
+@require_auth 
+def leaderboard_page():
+    """Global leaderboard page"""
+    user = AuthenticationManager.get_current_user()
+    return render_template('leaderboard.html', user=user)
+
+@app.route('/api/leaderboard')
+@require_auth
+def get_leaderboard():
+    """Get global leaderboard data"""
+    try:
+        # Get all users with commitment stats
+        users_result = supabase.table('users').select('*').execute()
+        
+        leaderboard = []
+        for user_data in users_result.data:
+            if user_data.get('telegram_user_id'):  # Only include users with Telegram accounts
+                # Get commitment counts
+                commitments_result = supabase.table('commitments').select('status').eq('user_id', user_data['id']).execute()
+                
+                total_commitments = len(commitments_result.data)
+                completed_commitments = len([c for c in commitments_result.data if c.get('status') == 'completed'])
+                
+                if total_commitments > 0:  # Only include users with commitments
+                    completion_rate = (completed_commitments / total_commitments) * 100
+                    
+                    leaderboard.append({
+                        'name': user_data.get('name', 'Anonymous'),
+                        'username': user_data.get('username', ''),
+                        'total_commitments': total_commitments,
+                        'completed_commitments': completed_commitments,
+                        'completion_rate': round(completion_rate, 1),
+                        'score': completed_commitments * 10 + total_commitments * 2  # Weighting formula
+                    })
+        
+        # Sort by score (completed commitments weighted higher)
+        leaderboard.sort(key=lambda x: x['score'], reverse=True)
+        
+        # Add ranks
+        for i, user in enumerate(leaderboard):
+            user['rank'] = i + 1
+        
+        return jsonify({
+            'status': 'success',
+            'leaderboard': leaderboard[:50]  # Top 50
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting leaderboard: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to load leaderboard'
+        }), 500
+
 @app.route('/')
 @require_auth
 def dashboard():
-    """Main dashboard showing system overview"""
+    """Redirect to user dashboard by default"""
+    return redirect(url_for('user_dashboard'))
+
+@app.route('/admin-dashboard')
+@require_role('admin')
+def admin_dashboard():
+    """Admin dashboard showing system overview"""
     user = AuthenticationManager.get_current_user()
     return render_template('dashboard.html', user=user)
 

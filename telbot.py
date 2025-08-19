@@ -417,25 +417,298 @@ class DatabaseManager:
 smart_analyzer = SmartAnalysis(config)
 
 # Initialize role manager
-from simple_role_manager import SimpleRoleManager as UserRoleManager
+from user_role_manager import UserRoleManager
 from user_analytics import UserAnalytics
-from dream_focused_analytics import DreamFocusedAnalytics
-from leaderboard import Leaderboard
+try:
+    from dream_focused_analytics import DreamFocusedAnalytics
+    dream_analytics = DreamFocusedAnalytics(supabase)
+except ImportError:
+    logger.warning("⚠️ DreamFocusedAnalytics not available")
+    dream_analytics = None
+try:
+    from leaderboard import Leaderboard
+    leaderboard = Leaderboard(supabase)
+except ImportError:
+    logger.warning("⚠️ Leaderboard not available")
+    leaderboard = None
 from pod_week_tracker import PodWeekTracker
-from attendance_adapter import AttendanceAdapter
-from nurture_sequences import NurtureSequences, SequenceType
-from enhanced_user_onboarding import EnhancedUserOnboarding
+try:
+    from attendance_adapter import AttendanceAdapter
+    meet_tracker = AttendanceAdapter(supabase)
+except ImportError:
+    logger.warning("⚠️ AttendanceAdapter not available")
+    meet_tracker = None
+try:
+    from nurture_sequences import NurtureSequences, SequenceType
+    nurture_system = NurtureSequences(supabase)
+except ImportError:
+    logger.warning("⚠️ NurtureSequences not available")
+    nurture_system = None
+try:
+    from enhanced_user_onboarding import EnhancedUserOnboarding
+    onboarding_system = EnhancedUserOnboarding(supabase)
+except ImportError:
+    logger.warning("⚠️ EnhancedUserOnboarding not available")
+    onboarding_system = None
+
 role_manager = UserRoleManager(supabase)
 user_analytics = UserAnalytics(supabase)
-dream_analytics = DreamFocusedAnalytics(supabase)
-leaderboard = Leaderboard(supabase)
 pod_tracker = PodWeekTracker(supabase)
-meet_tracker = AttendanceAdapter(supabase)
-nurture_system = NurtureSequences(supabase)
-onboarding_system = EnhancedUserOnboarding(supabase)
 
 # Temporary storage for callback data (use Redis in production)
 temp_storage = {}
+
+class CommitmentTracker:
+    """Advanced commitment tracking with reminders and accountability features"""
+    
+    def __init__(self, supabase_client: Client, bot: Bot):
+        self.supabase = supabase_client
+        self.bot = bot
+        
+    async def schedule_reminder(self, telegram_user_id: int, commitment_id: str, reminder_time: datetime):
+        """Schedule a reminder for a specific commitment"""
+        try:
+            reminder_data = {
+                "telegram_user_id": telegram_user_id,
+                "commitment_id": commitment_id,
+                "reminder_time": reminder_time.isoformat(),
+                "status": "scheduled",
+                "created_at": datetime.now().isoformat()
+            }
+            
+            result = self.supabase.table("commitment_reminders").insert(reminder_data).execute()
+            logger.info(f"✅ Reminder scheduled for commitment {commitment_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error scheduling reminder: {e}")
+            return False
+    
+    async def get_pending_reminders(self) -> List[Dict]:
+        """Get all pending reminders that are due"""
+        try:
+            current_time = datetime.now().isoformat()
+            
+            result = self.supabase.table("commitment_reminders").select(
+                "*, commitments(id, commitment, telegram_user_id)"
+            ).eq("status", "scheduled").lte("reminder_time", current_time).execute()
+            
+            return result.data if result.data else []
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting pending reminders: {e}")
+            return []
+    
+    async def send_reminder(self, reminder: Dict):
+        """Send a reminder message to user"""
+        try:
+            telegram_user_id = reminder["telegram_user_id"]
+            commitment = reminder["commitments"]
+            
+            if not commitment:
+                return False
+                
+            reminder_text = f"⏰ **Commitment Reminder**\n\n" \
+                           f"📝 \"{commitment['commitment']}\"\n\n" \
+                           f"How's this going? Ready to mark it complete?\n" \
+                           f"Use /done to check it off! 💪"
+            
+            await self.bot.send_message(
+                chat_id=telegram_user_id,
+                text=reminder_text,
+                parse_mode="Markdown"
+            )
+            
+            # Mark reminder as sent
+            await self.mark_reminder_sent(reminder["id"])
+            
+            logger.info(f"✅ Reminder sent to user {telegram_user_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error sending reminder: {e}")
+            return False
+    
+    async def mark_reminder_sent(self, reminder_id: str):
+        """Mark reminder as sent"""
+        try:
+            self.supabase.table("commitment_reminders").update({
+                "status": "sent",
+                "sent_at": datetime.now().isoformat()
+            }).eq("id", reminder_id).execute()
+            
+        except Exception as e:
+            logger.error(f"❌ Error marking reminder as sent: {e}")
+    
+    async def get_commitment_progress(self, telegram_user_id: int) -> Dict[str, Any]:
+        """Get detailed progress statistics for a user"""
+        try:
+            # Get total commitments
+            total_result = self.supabase.table("commitments").select("count", count="exact").eq("telegram_user_id", telegram_user_id).execute()
+            total_commitments = total_result.count or 0
+            
+            # Get completed commitments
+            completed_result = self.supabase.table("commitments").select("count", count="exact").eq("telegram_user_id", telegram_user_id).eq("status", "completed").execute()
+            completed_commitments = completed_result.count or 0
+            
+            # Get active commitments
+            active_result = self.supabase.table("commitments").select("count", count="exact").eq("telegram_user_id", telegram_user_id).eq("status", "active").execute()
+            active_commitments = active_result.count or 0
+            
+            # Calculate completion rate
+            completion_rate = (completed_commitments / total_commitments * 100) if total_commitments > 0 else 0
+            
+            # Get streak information
+            streak = await self.calculate_commitment_streak(telegram_user_id)
+            
+            return {
+                "total_commitments": total_commitments,
+                "completed_commitments": completed_commitments,
+                "active_commitments": active_commitments,
+                "completion_rate": round(completion_rate, 1),
+                "current_streak": streak,
+                "progress_level": self._get_progress_level(completion_rate, total_commitments)
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting commitment progress: {e}")
+            return {}
+    
+    async def calculate_commitment_streak(self, telegram_user_id: int) -> int:
+        """Calculate current commitment completion streak"""
+        try:
+            # Get recent completed commitments ordered by completion date
+            result = self.supabase.table("commitments").select("completed_at").eq(
+                "telegram_user_id", telegram_user_id
+            ).eq("status", "completed").order("completed_at", desc=True).limit(30).execute()
+            
+            if not result.data:
+                return 0
+                
+            streak = 0
+            current_date = datetime.now().date()
+            
+            for commitment in result.data:
+                if not commitment.get("completed_at"):
+                    continue
+                    
+                completed_date = datetime.fromisoformat(commitment["completed_at"].replace('Z', '+00:00')).date()
+                expected_date = current_date - timedelta(days=streak)
+                
+                if completed_date == expected_date:
+                    streak += 1
+                else:
+                    break
+                    
+            return streak
+            
+        except Exception as e:
+            logger.error(f"❌ Error calculating streak: {e}")
+            return 0
+    
+    def _get_progress_level(self, completion_rate: float, total_commitments: int) -> str:
+        """Determine user's progress level based on stats"""
+        if total_commitments < 5:
+            return "🌱 Getting Started"
+        elif completion_rate >= 90:
+            return "🔥 Consistency Master"
+        elif completion_rate >= 75:
+            return "💪 Strong Performer"
+        elif completion_rate >= 50:
+            return "📈 Building Momentum"
+        else:
+            return "🎯 Finding Rhythm"
+    
+    async def send_accountability_check(self, telegram_user_id: int):
+        """Send accountability check-in for overdue commitments"""
+        try:
+            # Get commitments older than 24 hours without completion
+            yesterday = (datetime.now() - timedelta(hours=24)).isoformat()
+            
+            result = self.supabase.table("commitments").select("*").eq(
+                "telegram_user_id", telegram_user_id
+            ).eq("status", "active").lt("created_at", yesterday).execute()
+            
+            if not result.data:
+                return False
+                
+            overdue_count = len(result.data)
+            
+            accountability_text = f"🤔 **Accountability Check-In**\n\n" \
+                                 f"You have {overdue_count} commitment{'s' if overdue_count != 1 else ''} " \
+                                 f"from yesterday or earlier:\n\n"
+            
+            for i, commitment in enumerate(result.data[:3], 1):  # Show max 3
+                accountability_text += f"{i}. \"{commitment['commitment']}\"\n"
+            
+            if overdue_count > 3:
+                accountability_text += f"... and {overdue_count - 3} more\n"
+                
+            accountability_text += f"\n💭 Sometimes life happens - that's totally normal!\n" \
+                                  f"Ready to check some off or adjust your goals?\n\n" \
+                                  f"Use /done to mark completed or /list to review all."
+            
+            await self.bot.send_message(
+                chat_id=telegram_user_id,
+                text=accountability_text,
+                parse_mode="Markdown"
+            )
+            
+            logger.info(f"✅ Accountability check sent to user {telegram_user_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error sending accountability check: {e}")
+            return False
+
+# Initialize commitment tracker
+commitment_tracker = CommitmentTracker(supabase, bot)
+
+async def process_pending_reminders():
+    """Process and send pending reminders - call this periodically"""
+    try:
+        pending_reminders = await commitment_tracker.get_pending_reminders()
+        
+        for reminder in pending_reminders:
+            await commitment_tracker.send_reminder(reminder)
+            
+        if pending_reminders:
+            logger.info(f"✅ Processed {len(pending_reminders)} pending reminders")
+            
+        return len(pending_reminders)
+        
+    except Exception as e:
+        logger.error(f"❌ Error processing pending reminders: {e}")
+        return 0
+
+async def send_daily_accountability_checks():
+    """Send daily accountability checks to users with overdue commitments"""
+    try:
+        # Get all users with active commitments older than 24 hours
+        yesterday = (datetime.now() - timedelta(hours=24)).isoformat()
+        
+        result = supabase.table("commitments").select("telegram_user_id").eq(
+            "status", "active"
+        ).lt("created_at", yesterday).execute()
+        
+        if not result.data:
+            return 0
+            
+        # Get unique user IDs
+        user_ids = list(set(item["telegram_user_id"] for item in result.data))
+        
+        sent_count = 0
+        for user_id in user_ids:
+            success = await commitment_tracker.send_accountability_check(user_id)
+            if success:
+                sent_count += 1
+                
+        logger.info(f"✅ Sent {sent_count} accountability check-ins")
+        return sent_count
+        
+    except Exception as e:
+        logger.error(f"❌ Error sending daily accountability checks: {e}")
+        return 0
 
 # Helper function for nurture sequence triggers
 async def _trigger_commitment_sequences(telegram_user_id: int):
@@ -1117,7 +1390,21 @@ async def progress_handler(message: Message):
     )
     
     # Get and format dream-focused analytics
-    progress_message = await dream_analytics.format_meaningful_message(user_id)
+    if dream_analytics:
+        progress_message = await dream_analytics.format_meaningful_message(user_id)
+    else:
+        # Fallback progress message using commitment tracker
+        progress = await commitment_tracker.get_commitment_progress(user_id)
+        if progress:
+            progress_message = f"📊 **Your Progress**\n\n" \
+                             f"• Total Commitments: {progress['total_commitments']}\n" \
+                             f"• Completed: {progress['completed_commitments']}\n" \
+                             f"• Success Rate: {progress['completion_rate']}%\n" \
+                             f"• Current Streak: {progress['current_streak']} days\n\n" \
+                             f"**Level**: {progress['progress_level']}\n\n" \
+                             f"Keep building those habits! 🚀"
+        else:
+            progress_message = "🌱 Ready to start your progress journey?\n\nUse /commit to add your first goal!"
     
     await message.answer(progress_message, parse_mode="Markdown")
 
@@ -1468,6 +1755,183 @@ async def fix_loading_handler(message: Message):
         "• Your commitments are still being saved!"
     )
 
+@dp.message(Command("remind"))
+async def remind_handler(message: Message):
+    """Set reminder for commitment"""
+    command_parts = message.text.split(maxsplit=2)
+    
+    if len(command_parts) < 3:
+        await message.answer(
+            "⏰ **Set Commitment Reminders**\n\n"
+            "Usage: `/remind <hours> <commitment text>`\n\n"
+            "Examples:\n"
+            "• `/remind 2 workout for 30 minutes` - Remind in 2 hours\n"
+            "• `/remind 24 finish project report` - Remind in 24 hours\n\n"
+            "💡 I'll send you a friendly reminder when it's time!",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        hours = int(command_parts[1])
+        commitment_text = command_parts[2].strip()
+        user_id = message.from_user.id
+        
+        if hours <= 0 or hours > 168:  # Max 1 week
+            await message.answer("⏰ Please set reminder between 1 hour and 168 hours (1 week)")
+            return
+        
+        # First, create the commitment
+        analysis = await smart_analyzer.analyze_commitment(commitment_text)
+        success = await DatabaseManager.save_commitment(
+            telegram_user_id=user_id,
+            commitment=commitment_text,
+            original_commitment=commitment_text,
+            smart_score=analysis.get("score", 6)
+        )
+        
+        if success:
+            # Get the commitment ID (latest one for this user)
+            commitments = await DatabaseManager.get_active_commitments(user_id)
+            if commitments:
+                commitment_id = commitments[0]["id"]  # Most recent
+                
+                # Schedule reminder
+                reminder_time = datetime.now() + timedelta(hours=hours)
+                await commitment_tracker.schedule_reminder(user_id, commitment_id, reminder_time)
+                
+                await message.answer(
+                    f"✅ **Commitment & Reminder Set!**\n\n"
+                    f"📝 \"{commitment_text}\"\n"
+                    f"⏰ Reminder: {reminder_time.strftime('%Y-%m-%d at %I:%M %p')}\n\n"
+                    f"I'll check in with you then! 💪"
+                )
+            else:
+                await message.answer("❌ Error setting up reminder. Please try again.")
+        else:
+            await message.answer("❌ Error creating commitment. Please try again.")
+            
+    except ValueError:
+        await message.answer("⚠️ Please enter a valid number of hours")
+    except Exception as e:
+        logger.error(f"Error in remind handler: {e}")
+        await message.answer("❌ Error setting reminder. Please try again.")
+
+@dp.message(Command("track"))
+async def track_handler(message: Message):
+    """Show detailed commitment tracking and progress"""
+    user_id = message.from_user.id
+    
+    try:
+        # Get comprehensive progress data
+        progress = await commitment_tracker.get_commitment_progress(user_id)
+        
+        if not progress:
+            await message.answer(
+                "📊 No tracking data yet!\n\n"
+                "Start with /commit to add your first commitment and build your progress! 🚀"
+            )
+            return
+        
+        track_text = f"📊 **Your Commitment Journey**\n\n"
+        track_text += f"🎯 **Overall Progress**\n"
+        track_text += f"• Total Commitments: {progress['total_commitments']}\n"
+        track_text += f"• Completed: {progress['completed_commitments']}\n"
+        track_text += f"• Active: {progress['active_commitments']}\n"
+        track_text += f"• Success Rate: {progress['completion_rate']}%\n\n"
+        
+        track_text += f"🔥 **Current Streak**: {progress['current_streak']} days\n"
+        track_text += f"🏆 **Level**: {progress['progress_level']}\n\n"
+        
+        # Add motivational message based on performance
+        if progress['completion_rate'] >= 80:
+            track_text += "🌟 **Amazing consistency!** You're building powerful habits!"
+        elif progress['completion_rate'] >= 60:
+            track_text += "💪 **Great progress!** Keep up the momentum!"
+        elif progress['completion_rate'] >= 40:
+            track_text += "📈 **Building momentum!** Small steps lead to big wins!"
+        else:
+            track_text += "🌱 **Every start is progress!** Focus on small, consistent steps!"
+            
+        track_text += f"\n\n💡 Use /commit to add more goals or /done to check off completed ones!"
+        
+        await message.answer(track_text, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Error in track handler: {e}")
+        await message.answer("❌ Error getting tracking data. Please try again.")
+
+@dp.message(Command("checkin"))
+async def checkin_handler(message: Message):
+    """Manual accountability check-in"""
+    user_id = message.from_user.id
+    
+    try:
+        # Send accountability check
+        success = await commitment_tracker.send_accountability_check(user_id)
+        
+        if not success:
+            await message.answer(
+                "✅ **All caught up!**\n\n"
+                "You don't have any overdue commitments right now. Great job staying on track! 🎉\n\n"
+                "Use /commit to add new goals or /track to see your progress!"
+            )
+        
+    except Exception as e:
+        logger.error(f"Error in checkin handler: {e}")
+        await message.answer("❌ Error during check-in. Please try again.")
+
+@dp.message(Command("streakboost"))
+async def streakboost_handler(message: Message):
+    """Get personalized streak-building tips"""
+    user_id = message.from_user.id
+    
+    try:
+        progress = await commitment_tracker.get_commitment_progress(user_id)
+        current_streak = progress.get('current_streak', 0)
+        completion_rate = progress.get('completion_rate', 0)
+        
+        boost_text = f"🔥 **Streak Boost Tips**\n\n"
+        boost_text += f"Current Streak: **{current_streak} days**\n\n"
+        
+        if current_streak == 0:
+            boost_text += "🌱 **Starting Your Streak:**\n"
+            boost_text += "• Begin with ONE small, achievable commitment\n"
+            boost_text += "• Set a specific time to do it daily\n"
+            boost_text += "• Use /remind to get helpful nudges\n"
+            boost_text += "• Focus on consistency over perfection\n\n"
+            boost_text += "💡 **Today's Challenge:** Make one micro-commitment and complete it!"
+            
+        elif current_streak < 7:
+            boost_text += "📈 **Building Momentum:**\n"
+            boost_text += "• You're doing great! Keep the momentum going\n"
+            boost_text += "• Stack your habit with something you already do\n"
+            boost_text += "• Celebrate small wins - they add up!\n"
+            boost_text += "• Plan tomorrow's commitment tonight\n\n"
+            boost_text += f"🎯 **Goal:** Reach 7 days for your first week!"
+            
+        elif current_streak < 21:
+            boost_text += "💪 **Solid Foundation:**\n"
+            boost_text += "• Excellent work building consistency!\n"
+            boost_text += "• Consider slightly increasing challenge level\n"
+            boost_text += "• Track your wins to see progress patterns\n"
+            boost_text += "• Share your success with accountability partners\n\n"
+            boost_text += f"🎯 **Goal:** 21 days makes a strong habit!"
+            
+        else:
+            boost_text += "🏆 **Streak Master:**\n"
+            boost_text += "• Outstanding dedication! You're an inspiration!\n"
+            boost_text += "• Consider mentoring others or joining pods\n"
+            boost_text += "• Explore bigger, more impactful commitments\n"
+            boost_text += "• Use your consistency to tackle long-term goals\n\n"
+            boost_text += f"🚀 **Challenge:** Help others build their streaks too!"
+            
+        await message.answer(boost_text, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Error in streakboost handler: {e}")
+        await message.answer("❌ Error getting streak tips. Please try again.")
+
 @dp.message()
 async def handle_text_messages(message: Message):
     """Handle all other text messages with enhanced onboarding"""
@@ -1523,8 +1987,12 @@ async def set_bot_commands():
     commands = [
         BotCommand(command="start", description="Welcome message"),
         BotCommand(command="commit", description="Add a new commitment"),
+        BotCommand(command="remind", description="Set commitment with reminder"),
         BotCommand(command="done", description="Mark commitments as complete"),
         BotCommand(command="list", description="View your active commitments"),
+        BotCommand(command="track", description="See detailed progress tracking"),
+        BotCommand(command="checkin", description="Accountability check-in"),
+        BotCommand(command="streakboost", description="Get streak-building tips"),
         BotCommand(command="progress", description="See your meaningful progress"),
         BotCommand(command="stats", description="View points & achievements"),
         BotCommand(command="leaderboard", description="See this week's top performers"),

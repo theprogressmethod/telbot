@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Progress - The Progress Method</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            position: relative;
+        }
+        
+        .user-info {
+            position: absolute;
+            top: 1rem;
+            right: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .user-info span {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .header-content {
+            text-align: center;
+            margin-top: 1rem;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .navigation {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+            margin-bottom: 2rem;
+        }
+        
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+        
+        .nav-links a {
+            text-decoration: none;
+            color: #667eea;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: background-color 0.3s ease;
+        }
+        
+        .nav-links a:hover, .nav-links a.active {
+            background: #f0f4ff;
+            color: #5a67d8;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem 2rem;
+        }
+        
+        /* Level & Progress Section */
+        .level-section {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 16px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .level-display {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .level-name {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .progress-bar {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            height: 12px;
+            margin: 1rem 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #43e97b 0%, #38f9d7 100%);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+        
+        .progress-text {
+            margin-top: 0.5rem;
+            opacity: 0.9;
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .stat-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .stat-icon {
+            font-size: 1.5rem;
+        }
+        
+        .stat-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #666;
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-subtitle {
+            color: #888;
+            font-size: 0.9rem;
+        }
+        
+        .trend {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .trend.up {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+        
+        .trend.down {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        
+        .trend.neutral {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+        
+        /* Commitment Section */
+        .commitment-section {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .commitment-feed {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .section-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: between;
+        }
+        
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .commitment-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .commitment-item {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background-color 0.2s ease;
+        }
+        
+        .commitment-item:hover {
+            background: #f8fafc;
+        }
+        
+        .commitment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .commitment-status {
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .commitment-status.completed {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+        
+        .commitment-status.active {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+        
+        .commitment-status.overdue {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        
+        .commitment-text {
+            font-size: 0.95rem;
+            line-height: 1.4;
+            color: #4b5563;
+            margin-bottom: 0.5rem;
+        }
+        
+        .commitment-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: #9ca3af;
+        }
+        
+        .commitment-score {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        /* Achievement Sidebar */
+        .achievement-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        
+        .achievements-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .achievement-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        
+        .achievement-item:last-child {
+            border-bottom: none;
+        }
+        
+        .achievement-icon {
+            font-size: 2rem;
+            width: 50px;
+            text-align: center;
+        }
+        
+        .achievement-info {
+            flex: 1;
+        }
+        
+        .achievement-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.25rem;
+        }
+        
+        .achievement-desc {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        
+        .achievement-points {
+            font-size: 0.9rem;
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        /* Motivational Message */
+        .motivation-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .motivation-text {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+        
+        .next-goal {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .commitment-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .user-info {
+                position: static;
+                justify-content: center;
+                margin-bottom: 1rem;
+            }
+            
+            .header-content {
+                margin-top: 0;
+            }
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: #667eea;
+            font-size: 1.1rem;
+        }
+        
+        .error {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="user-info">
+            {% if user %}
+                <span>👤 {{ user.name or user.username }}</span>
+                {% if user.roles %}
+                    <span>🎭 {{ user.roles|join(', ') }}</span>
+                {% endif %}
+                <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+            {% endif %}
+        </div>
+        
+        <div class="header-content">
+            <h1>🎯 My Progress Dashboard</h1>
+            <p class="subtitle">Track your commitments, celebrate your wins, and level up your life</p>
+        </div>
+    </div>
+    
+    <div class="navigation">
+        <div class="nav-container">
+            <div class="nav-links">
+                <a href="/user-dashboard" class="active">📊 My Progress</a>
+                <a href="/analytics">👥 Pod Activity</a>
+                <a href="/leaderboard">🏆 Leaderboard</a>
+                <a href="/automatic-attendance">📈 Meet Analytics</a>
+                <a href="/admin-dashboard">⚙️ System Admin</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <!-- Level & Progress -->
+        <div class="level-section" id="levelSection">
+            <div class="loading">Loading your progress...</div>
+        </div>
+        
+        <!-- Key Stats Grid -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="loading">Loading stats...</div>
+        </div>
+        
+        <!-- Main Content Area -->
+        <div class="commitment-section">
+            <!-- Commitment Feed -->
+            <div class="commitment-feed">
+                <div class="section-header">
+                    <div class="section-title">
+                        📝 Recent Commitments
+                    </div>
+                </div>
+                <div class="commitment-list" id="commitmentList">
+                    <div class="loading">Loading commitments...</div>
+                </div>
+            </div>
+            
+            <!-- Achievement Sidebar -->
+            <div class="achievement-sidebar">
+                <!-- Achievements -->
+                <div class="achievements-card">
+                    <div class="section-header">
+                        <div class="section-title">🏆 Achievements</div>
+                    </div>
+                    <div id="achievementsList">
+                        <div class="loading">Loading achievements...</div>
+                    </div>
+                </div>
+                
+                <!-- Motivational Message -->
+                <div class="motivation-card" id="motivationCard">
+                    <div class="loading">Loading motivation...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let userStats = null;
+        
+        async function loadUserDashboard() {
+            try {
+                // Load user stats
+                const response = await fetch('/api/user-stats');
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    userStats = result.stats;
+                    renderLevelSection(userStats);
+                    renderStatsGrid(userStats);
+                    renderMotivationCard(userStats);
+                } else {
+                    showError('Failed to load user stats');
+                }
+                
+                // Load commitments
+                await loadCommitments();
+                
+                // Load achievements
+                await loadAchievements();
+                
+            } catch (error) {
+                console.error('Dashboard loading error:', error);
+                showError('Unable to load dashboard data');
+            }
+        }
+        
+        function renderLevelSection(stats) {
+            const levelSection = document.getElementById('levelSection');
+            levelSection.innerHTML = `
+                <div class="level-display">${stats.level}</div>
+                <div class="level-name">${stats.level_name}</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${stats.level_progress_percent}%"></div>
+                </div>
+                <div class="progress-text">
+                    ${stats.total_points} / ${stats.total_points + stats.points_to_next_level} points to level ${stats.level + 1}
+                </div>
+            `;
+        }
+        
+        function renderStatsGrid(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+            
+            const trendClass = stats.week_over_week_change > 0 ? 'up' : 
+                               stats.week_over_week_change < 0 ? 'down' : 'neutral';
+            const trendSymbol = stats.weekly_trend;
+            
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon">🔥</div>
+                        <div class="stat-title">Current Streak</div>
+                    </div>
+                    <div class="stat-value">${stats.current_streak}</div>
+                    <div class="stat-subtitle">
+                        days · Best: ${stats.longest_streak} days
+                        ${stats.days_until_next_milestone > 0 ? `<br>${stats.days_until_next_milestone} days to milestone` : ''}
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-title">Completion Rate</div>
+                    </div>
+                    <div class="stat-value">${stats.completion_rate}%</div>
+                    <div class="stat-subtitle">
+                        ${stats.completed_commitments} of ${stats.total_commitments} completed
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon">📈</div>
+                        <div class="stat-title">This Week</div>
+                    </div>
+                    <div class="stat-value">${stats.this_week_completions}</div>
+                    <div class="stat-subtitle">
+                        ${stats.this_week_rate}% completion rate
+                        <span class="trend ${trendClass}">
+                            ${trendSymbol} ${Math.abs(stats.week_over_week_change)}%
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon">🏆</div>
+                        <div class="stat-title">Global Rank</div>
+                    </div>
+                    <div class="stat-value">#${stats.global_rank}</div>
+                    <div class="stat-subtitle">
+                        Top ${stats.percentile}% · ${stats.achievements_earned} achievements
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderMotivationCard(stats) {
+            const motivationCard = document.getElementById('motivationCard');
+            motivationCard.innerHTML = `
+                <div class="motivation-text">${stats.motivational_message}</div>
+                <div class="next-goal">${stats.next_goal}</div>
+            `;
+        }
+        
+        async function loadCommitments() {
+            try {
+                const response = await fetch('/api/user-commitments');
+                const result = await response.json();
+                
+                const commitmentList = document.getElementById('commitmentList');
+                
+                if (result.status === 'success' && result.commitments.length > 0) {
+                    commitmentList.innerHTML = result.commitments.map(commitment => `
+                        <div class="commitment-item">
+                            <div class="commitment-header">
+                                <span class="commitment-status ${commitment.status}">
+                                    ${commitment.status}
+                                </span>
+                                <div class="commitment-score">
+                                    ⭐ ${commitment.smart_score || 'N/A'}
+                                </div>
+                            </div>
+                            <div class="commitment-text">${commitment.commitment_text}</div>
+                            <div class="commitment-meta">
+                                <span>📅 ${new Date(commitment.created_at).toLocaleDateString()}</span>
+                                ${commitment.due_date ? `<span>⏰ Due ${new Date(commitment.due_date).toLocaleDateString()}</span>` : ''}
+                                <span>🎯 ${commitment.category || 'General'}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    commitmentList.innerHTML = `
+                        <div style="padding: 2rem; text-align: center; color: #666;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">🎯</div>
+                            <div>No commitments yet!</div>
+                            <div style="margin-top: 0.5rem; font-size: 0.9rem;">
+                                Make your first commitment via Telegram @TPM_superbot
+                            </div>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('Error loading commitments:', error);
+                document.getElementById('commitmentList').innerHTML = 
+                    '<div class="error">Failed to load commitments</div>';
+            }
+        }
+        
+        async function loadAchievements() {
+            if (!userStats || userStats.achievements_earned === 0) {
+                document.getElementById('achievementsList').innerHTML = `
+                    <div style="padding: 1rem; text-align: center; color: #666;">
+                        <div>No achievements yet!</div>
+                        <div style="font-size: 0.85rem; margin-top: 0.5rem;">
+                            Complete commitments to earn your first achievement
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/user-achievements');
+                const result = await response.json();
+                
+                if (result.status === 'success' && result.achievements.length > 0) {
+                    document.getElementById('achievementsList').innerHTML = 
+                        result.achievements.slice(0, 5).map(achievement => `
+                            <div class="achievement-item">
+                                <div class="achievement-icon">${achievement.name.split(' ')[0]}</div>
+                                <div class="achievement-info">
+                                    <div class="achievement-name">${achievement.name.substring(2)}</div>
+                                    <div class="achievement-desc">${achievement.description}</div>
+                                </div>
+                                <div class="achievement-points">+${achievement.points}</div>
+                            </div>
+                        `).join('');
+                } else {
+                    throw new Error('No achievements found');
+                }
+                
+            } catch (error) {
+                document.getElementById('achievementsList').innerHTML = 
+                    '<div class="error">Failed to load achievements</div>';
+            }
+        }
+        
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/login';
+                } else {
+                    console.error('Logout failed');
+                    window.location.href = '/login';
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                window.location.href = '/login';
+            }
+        }
+        
+        function showError(message) {
+            console.error(message);
+            // You could show a toast notification here
+        }
+        
+        // Load dashboard when page loads
+        window.addEventListener('load', loadUserDashboard);
+        
+        // Auto-refresh stats every 5 minutes
+        setInterval(() => {
+            loadUserDashboard();
+        }, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
