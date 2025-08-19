@@ -1,0 +1,244 @@
+# Protected Paths Configuration - Claude Orchestra Safety System
+# WORKER_3 PREP-001C Implementation
+#
+# This file defines file and directory paths that require special permissions
+# or validation before modification. Lines starting with # are comments.
+#
+# Format: Each line should contain a path pattern that will be matched against
+# modified files. Paths can use glob patterns and should be relative to repository root.
+
+# ==========================================
+# CRITICAL ORCHESTRATION SYSTEM FILES
+# ==========================================
+
+# Control system files - require emergency override
+.claude-orchestra/control/
+.claude-orchestra/control/emergency-stop.flag
+.claude-orchestra/control/system-state.json
+.claude-orchestra/control/master-plan.md
+
+# Status tracking files - managed by system only
+.claude-orchestra/status/active-worker.md
+.claude-orchestra/status/task-queue.md
+.claude-orchestra/status/worker-assignments.json
+.claude-orchestra/status/system-health.json
+
+# System logs - append-only by hooks
+.claude-orchestra/logs/orchestration.log
+.claude-orchestra/logs/recent-work.log
+.claude-orchestra/logs/system-events.log
+.claude-orchestra/logs/error-log.json
+
+# ==========================================
+# PRODUCTION & DEPLOYMENT FILES
+# ==========================================
+
+# Production configuration
+production/
+production/config/
+production/secrets/
+production/deploy/
+
+# Environment files with sensitive data
+.env.production
+.env.staging
+.env.live
+
+# Docker production configurations
+docker-compose.prod.yml
+docker-compose.production.yml
+Dockerfile.prod
+
+# Kubernetes manifests
+k8s/production/
+k8s/staging/
+manifests/production/
+
+# ==========================================
+# CONFIGURATION FILES
+# ==========================================
+
+# Application configuration
+config/production/
+config/staging/
+config/secrets/
+
+# Database configuration
+config/database/production.json
+config/database/staging.json
+
+# API configuration  
+config/api/production.yaml
+config/api/staging.yaml
+
+# ==========================================
+# SECURITY & CREDENTIALS
+# ==========================================
+
+# SSL/TLS certificates and keys
+*.key
+*.pem
+*.p12
+*.pfx
+certs/
+certificates/
+ssl/
+
+# SSH keys
+id_rsa
+id_ed25519
+*.pub
+
+# Service account files
+*service-account*.json
+*service-key*.json
+*credentials*.json
+
+# API key files
+api-keys/
+secrets/
+keys/
+
+# ==========================================
+# BUILD & DEPLOYMENT ARTIFACTS
+# ==========================================
+
+# Built application files
+dist/production/
+build/production/
+release/
+releases/
+
+# Package files with production configs
+package-lock.json.prod
+yarn.lock.prod
+Pipfile.lock.prod
+
+# ==========================================
+# DATABASE & MIGRATIONS
+# ==========================================
+
+# Production database files
+*.prod.db
+*.production.sqlite
+production.sql
+
+# Migration files (require careful review)
+migrations/production/
+migrations/deploy/
+
+# Database backup files
+*.backup
+*.dump
+backups/
+
+# ==========================================
+# MONITORING & LOGGING
+# ==========================================
+
+# Log files (should be managed by system)
+logs/production/
+logs/application/
+*.log
+access.log
+error.log
+
+# Monitoring configuration
+monitoring/production/
+alerting/production/
+grafana/production/
+
+# ==========================================
+# THIRD-PARTY INTEGRATIONS
+# ==========================================
+
+# CI/CD configuration files
+.github/workflows/deploy.yml
+.gitlab-ci.production.yml
+.circleci/config.production.yml
+
+# Cloud provider configurations
+.aws/production/
+.gcp/production/
+azure/production/
+
+# CDN configurations
+cloudflare/production/
+cdn/production/
+
+# ==========================================
+# LEGACY & ARCHIVED FILES
+# ==========================================
+
+# Archived configurations
+archive/production/
+legacy/production/
+old/production/
+
+# Backup configurations
+backup/production/
+backups/config/
+
+# ==========================================
+# DEVELOPMENT FILES THAT NEED PROTECTION
+# ==========================================
+
+# Test files with production data
+tests/data/production/
+fixtures/production/
+test-data/real/
+
+# Configuration templates with secrets
+templates/production/
+examples/with-secrets/
+
+# ==========================================
+# DOCUMENTATION WITH SENSITIVE INFO
+# ==========================================
+
+# Deployment documentation
+docs/deployment/production/
+docs/runbooks/production/
+docs/secrets/
+
+# API documentation with real endpoints
+docs/api/production-endpoints.md
+docs/api/live-examples.md
+
+# ==========================================
+# CUSTOM PATTERNS FOR THIS PROJECT
+# ==========================================
+
+# Telegram bot production configs
+bot/production/
+telegram/production/
+telbot-production.json
+
+# Supabase production configurations
+supabase/production/
+database/production/
+
+# ActiveCampaign production configs
+activecampaign/production/
+email/production/
+
+# Google Meet service account files
+google-meet-service-account.json
+*service-account*.json
+
+# ==========================================
+# GLOB PATTERNS FOR COMMON CASES  
+# ==========================================
+
+# Any file with "prod" or "production" in the name
+*production*
+*prod*
+*live*
+
+# Environment files
+.env*
+
+# Any configuration file in production directories
+*/production/*
+*/prod/*
+*/live/*

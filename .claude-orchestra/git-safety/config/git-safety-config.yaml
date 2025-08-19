@@ -1,0 +1,302 @@
+# Git Safety Configuration - Claude Orchestra System
+# WORKER_3 PREP-001C Implementation
+#
+# This file defines safety rules and policies for the Git repository
+# to ensure orchestration system integrity and worker collaboration safety.
+
+# Git Safety System Configuration
+git_safety:
+  version: "1.0"
+  enabled: true
+  
+  # Emergency override settings
+  emergency_override:
+    enabled: true
+    script_path: ".claude-orchestra/git-safety/scripts/emergency-override.sh"
+    log_overrides: true
+    require_reason: true
+
+# Branch Protection Rules
+branches:
+  # Protected branches that require special handling
+  protected:
+    - name: "main"
+      force_push_blocked: true
+      require_pr: false  # Set to true in production environments
+      direct_commits: "warn"  # "block", "warn", or "allow"
+      
+    - name: "master"
+      force_push_blocked: true
+      require_pr: false
+      direct_commits: "warn"
+      
+    - name: "production"
+      force_push_blocked: true
+      require_pr: true
+      direct_commits: "block"
+      deployment_checks: true
+      
+    - name: "staging"
+      force_push_blocked: true
+      require_pr: false
+      direct_commits: "warn"
+      deployment_checks: true
+  
+  # Branch naming conventions
+  naming_conventions:
+    enforce: true
+    patterns:
+      - "feature/*"
+      - "bugfix/*"
+      - "hotfix/*"
+      - "task/*"
+      - "worker/*"
+    allow_direct_names:
+      - "main"
+      - "master" 
+      - "production"
+      - "staging"
+      - "development"
+
+# File Protection Rules
+files:
+  # Maximum file size (in bytes)
+  max_size: 10485760  # 10MB
+  
+  # Protected paths that require special permissions to modify
+  protected_paths:
+    - path: ".claude-orchestra/control/"
+      reason: "Orchestration control files - critical system state"
+      override_required: true
+      
+    - path: ".claude-orchestra/status/"
+      reason: "Worker status tracking - managed by system"
+      override_required: false
+      
+    - path: ".claude-orchestra/logs/"
+      reason: "System logs - append-only by hooks"
+      override_required: false
+      
+    - path: "production/"
+      reason: "Production configuration files"
+      override_required: true
+      
+    - path: "config/"
+      reason: "Application configuration"
+      override_required: false
+      
+    - path: ".env.production"
+      reason: "Production environment variables"
+      override_required: true
+      
+    - path: ".env.staging"
+      reason: "Staging environment variables"
+      override_required: true
+
+  # File types that require security scanning
+  security_scan_types:
+    - ".env*"
+    - "*.key"
+    - "*.pem" 
+    - "*.p12"
+    - "*.json"
+    - "*.yaml"
+    - "*.yml"
+    - "*.py"
+    - "*.js"
+    - "*.ts"
+
+# Secret Detection Rules
+secrets:
+  enabled: true
+  
+  # Patterns for detecting credentials/secrets
+  patterns:
+    - name: "api_key"
+      regex: "api[_-]?key.*[=:].*['\"][a-zA-Z0-9]{20,}['\"]"
+      severity: "high"
+      
+    - name: "secret"
+      regex: "secret.*[=:].*['\"][a-zA-Z0-9]{20,}['\"]"
+      severity: "high"
+      
+    - name: "password"
+      regex: "password.*[=:].*['\"][^'\"]{8,}['\"]"
+      severity: "medium"
+      
+    - name: "token"
+      regex: "token.*[=:].*['\"][a-zA-Z0-9]{20,}['\"]"
+      severity: "high"
+      
+    - name: "openai_key"
+      regex: "sk-[a-zA-Z0-9]{48}"
+      severity: "critical"
+      
+    - name: "jwt_token"
+      regex: "eyJ[a-zA-Z0-9_-]*\\.[a-zA-Z0-9_-]*\\.[a-zA-Z0-9_-]*"
+      severity: "high"
+      
+    - name: "private_key"
+      regex: "-----BEGIN [A-Z ]+PRIVATE KEY-----"
+      severity: "critical"
+      
+    - name: "database_url"
+      regex: "(postgres|mysql|mongodb)://[^\\s]+"
+      severity: "high"
+
+  # Files to exclude from secret scanning
+  excluded_files:
+    - "*.md"
+    - "*.txt"
+    - "*.log"
+    - "tests/**"
+    - ".claude-orchestra/git-safety/config/*"
+    - "README*"
+
+# Orchestration-Specific Rules  
+orchestration:
+  # Worker boundary enforcement
+  worker_boundaries:
+    enforce: true
+    check_script: ".claude-orchestra/scripts/git-boundary-check.py"
+    
+  # Task validation
+  task_validation:
+    require_task_id: false  # Set to true to require task IDs in commits
+    valid_task_patterns:
+      - "BOT-[0-9]+"
+      - "DASH-[0-9]+"
+      - "TEST-[0-9]+"
+      - "PREP-[0-9]+[A-Z]*"
+    
+  # Worker identification in commits
+  worker_identification:
+    require_worker_id: false  # Set to true to require worker IDs in commits
+    valid_worker_patterns:
+      - "WORKER_[0-9]+"
+    
+  # Emergency stop integration
+  emergency_stop:
+    respect_emergency_flag: true
+    flag_file: ".claude-orchestra/control/emergency-stop.flag"
+    
+  # System state validation
+  state_validation:
+    check_active_worker: true
+    validate_task_queue: true
+    check_logs_consistency: false
+
+# Remote Repository Rules
+remotes:
+  # Remote safety checks
+  safety_checks:
+    validate_https_vs_ssh: "warn"  # "block", "warn", or "allow"
+    check_production_remotes: true
+    
+  # Production remote patterns (extra protection)
+  production_patterns:
+    - "production"
+    - "prod"
+    - "live"
+    - "deploy"
+
+# Logging and Monitoring
+logging:
+  # Log levels: debug, info, warn, error, critical
+  level: "info"
+  
+  # Log file management
+  orchestration_log:
+    file: ".claude-orchestra/logs/orchestration.log"
+    max_lines: 1000
+    rotate: true
+    
+  commit_summary_log:
+    file: ".claude-orchestra/logs/commit-summary.log" 
+    max_lines: 500
+    rotate: true
+    
+  checkout_summary_log:
+    file: ".claude-orchestra/logs/checkout-summary.log"
+    max_lines: 500
+    rotate: true
+
+# Hook Configuration
+hooks:
+  # Pre-commit hook settings
+  pre_commit:
+    enabled: true
+    check_file_size: true
+    check_secrets: true
+    check_protected_paths: true
+    validate_orchestration: true
+    
+  # Pre-push hook settings  
+  pre_push:
+    enabled: true
+    check_force_push: true
+    validate_remote_safety: true
+    check_deployment_readiness: true
+    validate_branch_protection: true
+    
+  # Post-commit hook settings
+  post_commit:
+    enabled: true
+    log_commits: true
+    update_worker_progress: true
+    validate_orchestration_consistency: false
+    trigger_notifications: false
+    
+  # Post-checkout hook settings
+  post_checkout:
+    enabled: true
+    validate_branch_safety: true
+    update_worker_status: true
+    check_branch_config: true
+    sync_orchestration_files: true
+
+# Notification Settings (Future Implementation)
+notifications:
+  enabled: false
+  
+  # Notification channels (placeholder for future features)
+  channels:
+    slack:
+      enabled: false
+      webhook_url: ""
+      channels:
+        - "#orchestra-alerts"
+        
+    discord:
+      enabled: false
+      webhook_url: ""
+      
+    email:
+      enabled: false
+      smtp_server: ""
+      recipients: []
+
+# Performance and Optimization  
+performance:
+  # Skip hooks for certain operations to improve performance
+  skip_hooks_for:
+    - "git stash"
+    - "git cherry-pick"
+    - "git rebase --continue"
+    
+  # Cache settings for validation scripts
+  cache:
+    enabled: false
+    directory: ".claude-orchestra/.cache"
+    max_age_minutes: 30
+
+# Development and Testing Settings
+development:
+  # Allow bypassing certain checks in development
+  relaxed_mode: false
+  
+  # Test mode settings
+  test_mode:
+    enabled: false
+    mock_external_calls: true
+    skip_expensive_validations: true
