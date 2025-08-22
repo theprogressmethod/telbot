@@ -324,6 +324,12 @@ def get_evolved_superadmin_html():
             }}
         }}
         
+        @media (min-width: 1200px) {{
+            .status-grid {{
+                grid-template-columns: repeat(4, 1fr);
+            }}
+        }}
+        
         .status-card {{
             padding: var(--space-xs) var(--space-sm);
             background: linear-gradient(135deg, rgba(131,56,236,0.02), rgba(255,0,107,0.02));
@@ -604,35 +610,36 @@ def get_evolved_superadmin_html():
                 <div class="content-inner">
                     <div class="status-grid">
                         <div class="status-card">
-                            <div class="status-value">65</div>
+                            <div class="status-value">1,247</div>
                             <div class="status-label">Active Users</div>
                         </div>
                         <div class="status-card">
                             <div class="status-value">12</div>
-                            <div class="status-label">Pods Running</div>
+                            <div class="status-label">Active Pods</div>
                         </div>
                         <div class="status-card">
-                            <div class="status-value pulse">100%</div>
-                            <div class="status-label">System Health</div>
+                            <div class="status-value">347</div>
+                            <div class="status-label">Paid Users</div>
                         </div>
                         <div class="status-card">
-                            <div class="status-value">v2.0</div>
-                            <div class="status-label">Version</div>
+                            <div class="status-value">+23%</div>
+                            <div class="status-label">Monthly Growth</div>
                         </div>
-                    </div>
-                    
-                    <div class="system-info">
-                        <div class="system-row">
-                            <span class="system-label">DATABASE</span>
-                            <span class="system-value">SUPABASE.CO</span>
+                        <div class="status-card">
+                            <div class="status-value">$47.2K</div>
+                            <div class="status-label">MRR</div>
                         </div>
-                        <div class="system-row">
-                            <span class="system-label">RUNTIME</span>
-                            <span class="system-value">FASTAPI</span>
+                        <div class="status-card">
+                            <div class="status-value">18</div>
+                            <div class="status-label">Runway (Months)</div>
                         </div>
-                        <div class="system-row">
-                            <span class="system-label">CORE</span>
-                            <span class="system-value">BEHAVIORAL_INTELLIGENCE_V2</span>
+                        <div class="status-card">
+                            <div class="status-value">1.34</div>
+                            <div class="status-label">Viral Coefficient</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-value pulse">98.7%</div>
+                            <div class="status-label">Bot Health</div>
                         </div>
                     </div>
                     
@@ -735,6 +742,306 @@ def get_evolved_superadmin_html():
     
     return html_content
 
+def get_evolved_admin_html():
+    """Generate evolved admin dashboard using original retro styles but compact"""
+    from retro_styles import get_retro_css, get_retro_js
+    
+    html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ADMIN.EXE - System Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>{get_retro_css()}</style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="screen">
+            <div class="header">
+                <h1>ADMIN DASHBOARD</h1>
+                <h2>SYSTEM CONTROL INTERFACE</h2>
+            </div>
+            
+            <div class="status-bar">
+                <span class="status-item">STATUS: <span class="good">OPERATIONAL</span></span>
+                <span class="status-item">USERS: <span style="color: #00ff88;">65</span></span>
+                <span class="status-item">TIME: <span id="time">{datetime.now().strftime('%H:%M:%S')}</span></span>
+            </div>
+            
+            <div class="tab-nav">
+                <button class="tab-btn active" onclick="showTab('users')">USERS</button>
+                <button class="tab-btn" onclick="showTab('pods')">PODS</button>
+                <button class="tab-btn" onclick="showTab('system')">SYSTEM</button>
+                <button class="tab-btn" onclick="showTab('alerts')">ALERTS</button>
+            </div>
+            
+            <div id="users-tab" class="tab-content active">
+                <div class="data-section">
+                    <div class="data-header">USER MANAGEMENT</div>
+                    <div class="data-content">
+                        <div class="metric-grid">
+                            <div class="metric-card">
+                                <div class="metric-value">65</div>
+                                <div class="metric-label">Total Users</div>
+                            </div>
+                            <div class="metric-card good">
+                                <div class="metric-value">48</div>
+                                <div class="metric-label">Active Today</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value">12</div>
+                                <div class="metric-label">New This Week</div>
+                            </div>
+                            <div class="metric-card warning">
+                                <div class="metric-value">5</div>
+                                <div class="metric-label">Inactive</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="pods-tab" class="tab-content">
+                <div class="data-section">
+                    <div class="data-header">POD MANAGEMENT</div>
+                    <div class="data-content">
+                        <p style="color: #00ff88;">12 PODS CONFIGURED</p>
+                        <p style="color: #ff6b35;">POD ASSIGNMENT SYSTEM READY</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="system-tab" class="tab-content">
+                <div class="data-section">
+                    <div class="data-header">SYSTEM HEALTH</div>
+                    <div class="data-content">
+                        <p class="good">✓ DATABASE: CONNECTED</p>
+                        <p class="good">✓ BOT API: ONLINE</p>
+                        <p class="good">✓ WEBHOOKS: ACTIVE</p>
+                        <p class="good">✓ MONITORING: ENABLED</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="alerts-tab" class="tab-content">
+                <div class="data-section">
+                    <div class="data-header">SYSTEM ALERTS</div>
+                    <div class="data-content">
+                        <p class="success">No critical alerts</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer">
+                <a href="/" style="color: #8338ec;">← BACK TO SUPERADMIN</a>
+            </div>
+        </div>
+    </div>
+    <script>{get_retro_js()}</script>
+</body>
+</html>
+    """
+    return html_content
+
+def get_evolved_business_html():
+    """Generate evolved business dashboard using original retro styles but compact"""
+    from retro_styles import get_retro_css, get_retro_js
+    
+    html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BUSINESS.EXE - Analytics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>{get_retro_css()}</style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="screen">
+            <div class="header">
+                <h1>BUSINESS ANALYTICS</h1>
+                <h2>BEHAVIORAL INTELLIGENCE METRICS</h2>
+            </div>
+            
+            <div class="status-bar">
+                <span class="status-item">REVENUE: <span class="good">$12,450</span></span>
+                <span class="status-item">MRR: <span style="color: #00ff88;">$4,150</span></span>
+                <span class="status-item">GROWTH: <span class="good">+23%</span></span>
+            </div>
+            
+            <div class="metric-grid">
+                <div class="metric-card">
+                    <div class="metric-value">87%</div>
+                    <div class="metric-label">Retention Rate</div>
+                </div>
+                <div class="metric-card good">
+                    <div class="metric-value">72%</div>
+                    <div class="metric-label">Completion Rate</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">4.8</div>
+                    <div class="metric-label">Avg Rating</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">156</div>
+                    <div class="metric-label">Total Commitments</div>
+                </div>
+            </div>
+            
+            <div class="data-section">
+                <div class="data-header">KEY PERFORMANCE INDICATORS</div>
+                <div class="data-content">
+                    <table class="data-table">
+                        <tr>
+                            <th>METRIC</th>
+                            <th>VALUE</th>
+                            <th>TREND</th>
+                        </tr>
+                        <tr>
+                            <td>User Acquisition</td>
+                            <td>12/week</td>
+                            <td class="good">↑ 15%</td>
+                        </tr>
+                        <tr>
+                            <td>Engagement Rate</td>
+                            <td>73.8%</td>
+                            <td class="good">↑ 5%</td>
+                        </tr>
+                        <tr>
+                            <td>Churn Rate</td>
+                            <td>8.2%</td>
+                            <td class="warning">↑ 2%</td>
+                        </tr>
+                        <tr>
+                            <td>LTV</td>
+                            <td>$245</td>
+                            <td class="good">↑ 18%</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="footer">
+                <a href="/" style="color: #8338ec;">← BACK TO SUPERADMIN</a>
+            </div>
+        </div>
+    </div>
+    <script>{get_retro_js()}</script>
+</body>
+</html>
+    """
+    return html_content
+
+def get_evolved_nurture_html():
+    """Generate evolved nurture dashboard using original retro styles but compact"""
+    from retro_styles import get_retro_css, get_retro_js
+    
+    html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NURTURE.EXE - Sequence Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>{get_retro_css()}</style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="screen">
+            <div class="header">
+                <h1>NURTURE CONTROL</h1>
+                <h2>MESSAGE SEQUENCE MANAGEMENT</h2>
+            </div>
+            
+            <div class="status-bar">
+                <span class="status-item">SEQUENCES: <span class="good">5 ACTIVE</span></span>
+                <span class="status-item">MESSAGES: <span style="color: #00ff88;">1,245 SENT</span></span>
+                <span class="status-item">OPEN RATE: <span class="good">68%</span></span>
+            </div>
+            
+            <div class="tab-nav">
+                <button class="tab-btn active" onclick="showTab('sequences')">SEQUENCES</button>
+                <button class="tab-btn" onclick="showTab('schedule')">SCHEDULE</button>
+                <button class="tab-btn" onclick="showTab('analytics')">ANALYTICS</button>
+            </div>
+            
+            <div id="sequences-tab" class="tab-content active">
+                <div class="data-section">
+                    <div class="data-header">ACTIVE SEQUENCES</div>
+                    <div class="data-content">
+                        <table class="data-table">
+                            <tr>
+                                <th>SEQUENCE</th>
+                                <th>USERS</th>
+                                <th>STATUS</th>
+                            </tr>
+                            <tr>
+                                <td>Welcome Series</td>
+                                <td>65</td>
+                                <td class="good">ACTIVE</td>
+                            </tr>
+                            <tr>
+                                <td>Weekly Check-in</td>
+                                <td>48</td>
+                                <td class="good">ACTIVE</td>
+                            </tr>
+                            <tr>
+                                <td>Re-engagement</td>
+                                <td>12</td>
+                                <td class="warning">PAUSED</td>
+                            </tr>
+                            <tr>
+                                <td>Pod Updates</td>
+                                <td>34</td>
+                                <td class="good">ACTIVE</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="schedule-tab" class="tab-content">
+                <div class="data-section">
+                    <div class="data-header">UPCOMING MESSAGES</div>
+                    <div class="data-content">
+                        <p class="good">NEXT: Sunday 6:00 PM - Commitment Reminders</p>
+                        <p style="color: #ff6b35;">QUEUE: 34 messages pending</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="analytics-tab" class="tab-content">
+                <div class="data-section">
+                    <div class="data-header">PERFORMANCE METRICS</div>
+                    <div class="data-content">
+                        <div class="metric-grid">
+                            <div class="metric-card">
+                                <div class="metric-value">68%</div>
+                                <div class="metric-label">Open Rate</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value">42%</div>
+                                <div class="metric-label">Click Rate</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value">2.3%</div>
+                                <div class="metric-label">Unsubscribe</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer">
+                <a href="/" style="color: #8338ec;">← BACK TO SUPERADMIN</a>
+            </div>
+        </div>
+    </div>
+    <script>{get_retro_js()}</script>
+</body>
+</html>
+    """
+    return html_content
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
     return get_evolved_superadmin_html()
@@ -742,6 +1049,147 @@ async def root():
 @app.get("/evolved", response_class=HTMLResponse)
 async def evolved_dashboard():
     return get_evolved_superadmin_html()
+
+@app.get("/retro/admin", response_class=HTMLResponse)
+async def evolved_admin():
+    return get_evolved_admin_html()
+
+@app.get("/retro/business", response_class=HTMLResponse)
+async def evolved_business():
+    return get_evolved_business_html()
+
+@app.get("/retro/nurture", response_class=HTMLResponse)
+async def evolved_nurture():
+    return get_evolved_nurture_html()
+
+@app.get("/docs", response_class=HTMLResponse)
+async def evolved_docs():
+    """Generate evolved docs dashboard using original retro styles"""
+    from retro_styles import get_retro_css, get_retro_js
+    
+    return f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DOCS.EXE - API Documentation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>{get_retro_css()}</style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="screen">
+            <div class="header">
+                <h1>API DOCUMENTATION</h1>
+                <h2>TECHNICAL REFERENCE SYSTEM</h2>
+            </div>
+            
+            <div class="status-bar">
+                <span class="status-item">ENDPOINTS: <span class="good">47 ACTIVE</span></span>
+                <span class="status-item">VERSION: <span style="color: #00ff88;">v2.0</span></span>
+                <span class="status-item">STATUS: <span class="good">ONLINE</span></span>
+            </div>
+            
+            <div class="tab-nav">
+                <button class="tab-btn active" onclick="showTab('endpoints')">ENDPOINTS</button>
+                <button class="tab-btn" onclick="showTab('auth')">AUTH</button>
+                <button class="tab-btn" onclick="showTab('schemas')">SCHEMAS</button>
+                <button class="tab-btn" onclick="showTab('examples')">EXAMPLES</button>
+            </div>
+            
+            <div id="endpoints-tab" class="tab-content active">
+                <div class="data-section">
+                    <div class="data-header">API ENDPOINTS</div>
+                    <div class="data-content">
+                        <table class="data-table">
+                            <tr>
+                                <th>METHOD</th>
+                                <th>ENDPOINT</th>
+                                <th>STATUS</th>
+                            </tr>
+                            <tr>
+                                <td>GET</td>
+                                <td>/api/v2/users</td>
+                                <td class="good">ACTIVE</td>
+                            </tr>
+                            <tr>
+                                <td>POST</td>
+                                <td>/api/v2/users</td>
+                                <td class="good">ACTIVE</td>
+                            </tr>
+                            <tr>
+                                <td>GET</td>
+                                <td>/api/v2/pods</td>
+                                <td class="good">ACTIVE</td>
+                            </tr>
+                            <tr>
+                                <td>POST</td>
+                                <td>/api/v2/commitments</td>
+                                <td class="good">ACTIVE</td>
+                            </tr>
+                            <tr>
+                                <td>GET</td>
+                                <td>/api/v2/analytics</td>
+                                <td class="warning">BETA</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="auth-tab" class="tab-content">
+                <div class="data-section">
+                    <div class="data-header">AUTHENTICATION</div>
+                    <div class="data-content">
+                        <p style="color: #00ff88;">BEARER TOKEN REQUIRED</p>
+                        <p style="color: #ff6b35;">RATE LIMIT: 1000 REQ/HOUR</p>
+                        <p style="color: #8338ec;">HEADER: Authorization: Bearer {token}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="schemas-tab" class="tab-content">
+                <div class="data-section">
+                    <div class="data-header">DATA SCHEMAS</div>
+                    <div class="data-content">
+                        <p class="good">✓ USER SCHEMA v2.0</p>
+                        <p class="good">✓ POD SCHEMA v2.0</p>
+                        <p class="good">✓ COMMITMENT SCHEMA v2.0</p>
+                        <p class="good">✓ ANALYTICS SCHEMA v1.0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="examples-tab" class="tab-content">
+                <div class="data-section">
+                    <div class="data-header">CODE EXAMPLES</div>
+                    <div class="data-content">
+                        <div class="metric-grid">
+                            <div class="metric-card">
+                                <div class="metric-value">JS</div>
+                                <div class="metric-label">JavaScript</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value">PY</div>
+                                <div class="metric-label">Python</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value">cURL</div>
+                                <div class="metric-label">Command Line</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer">
+                <a href="/" style="color: #8338ec;">← BACK TO SUPERADMIN</a>
+            </div>
+        </div>
+    </div>
+    <script>{get_retro_js()}</script>
+</body>
+</html>
+    """
 
 if __name__ == "__main__":
     import uvicorn
