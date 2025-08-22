@@ -724,9 +724,9 @@ def get_evolved_superadmin_html():
     return html_content
 
 def get_evolved_admin_html():
-    """Generate evolved admin dashboard focused on user management and database editing"""
-    from user_admin_dashboard import get_user_admin_html
-    return get_user_admin_html()
+    """Generate unified admin dashboard with Users and Pods tabs"""
+    from unified_admin_dashboard import get_unified_admin_html
+    return get_unified_admin_html()
 
 def get_evolved_business_html():
     """Generate evolved business dashboard using original retro styles but compact"""
@@ -938,12 +938,6 @@ async def evolved_dashboard():
 @app.get("/retro/admin", response_class=HTMLResponse)
 async def evolved_admin():
     return get_evolved_admin_html()
-
-@app.get("/retro/pods", response_class=HTMLResponse)
-async def evolved_pods():
-    """Generate evolved pod admin dashboard"""
-    from pod_admin_dashboard import get_pod_admin_html
-    return get_pod_admin_html()
 
 @app.get("/retro/business", response_class=HTMLResponse)
 async def evolved_business():
