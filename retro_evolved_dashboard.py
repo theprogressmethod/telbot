@@ -724,105 +724,9 @@ def get_evolved_superadmin_html():
     return html_content
 
 def get_evolved_admin_html():
-    """Generate evolved admin dashboard using original retro styles but compact"""
-    from retro_styles import get_retro_css, get_retro_js
-    
-    html_content = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <title>ADMIN.EXE - System Control</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>{get_retro_css()}</style>
-</head>
-<body>
-    <div class="terminal">
-        <div class="screen">
-            <div class="header">
-                <h1>ADMIN DASHBOARD</h1>
-                <h2>SYSTEM CONTROL INTERFACE</h2>
-            </div>
-            
-            <div class="status-bar">
-                <span class="status-item">STATUS: <span class="good">OPERATIONAL</span></span>
-                <span class="status-item">USERS: <span style="color: #00ff88;">65</span></span>
-                <span class="status-item">TIME: <span id="time">{datetime.now().strftime('%H:%M:%S')}</span></span>
-            </div>
-            
-            <div class="tab-nav">
-                <button class="tab-btn active" onclick="showTab('users')">USERS</button>
-                <button class="tab-btn" onclick="showTab('pods')">PODS</button>
-                <button class="tab-btn" onclick="showTab('system')">SYSTEM</button>
-                <button class="tab-btn" onclick="showTab('alerts')">ALERTS</button>
-            </div>
-            
-            <div id="users-tab" class="tab-content active">
-                <div class="data-section">
-                    <div class="data-header">USER MANAGEMENT</div>
-                    <div class="data-content">
-                        <div class="metric-grid">
-                            <div class="metric-card">
-                                <div class="metric-value">65</div>
-                                <div class="metric-label">Total Users</div>
-                            </div>
-                            <div class="metric-card good">
-                                <div class="metric-value">48</div>
-                                <div class="metric-label">Active Today</div>
-                            </div>
-                            <div class="metric-card">
-                                <div class="metric-value">12</div>
-                                <div class="metric-label">New This Week</div>
-                            </div>
-                            <div class="metric-card warning">
-                                <div class="metric-value">5</div>
-                                <div class="metric-label">Inactive</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="pods-tab" class="tab-content">
-                <div class="data-section">
-                    <div class="data-header">POD MANAGEMENT</div>
-                    <div class="data-content">
-                        <p style="color: #00ff88;">12 PODS CONFIGURED</p>
-                        <p style="color: #ff6b35;">POD ASSIGNMENT SYSTEM READY</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="system-tab" class="tab-content">
-                <div class="data-section">
-                    <div class="data-header">SYSTEM HEALTH</div>
-                    <div class="data-content">
-                        <p class="good">✓ DATABASE: CONNECTED</p>
-                        <p class="good">✓ BOT API: ONLINE</p>
-                        <p class="good">✓ WEBHOOKS: ACTIVE</p>
-                        <p class="good">✓ MONITORING: ENABLED</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="alerts-tab" class="tab-content">
-                <div class="data-section">
-                    <div class="data-header">SYSTEM ALERTS</div>
-                    <div class="data-content">
-                        <p class="success">No critical alerts</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="footer">
-                <a href="/" style="color: #8338ec;">← BACK TO SUPERADMIN</a>
-            </div>
-        </div>
-    </div>
-    <script>{get_retro_js()}</script>
-</body>
-</html>
-    """
-    return html_content
+    """Generate evolved admin dashboard focused on user management and database editing"""
+    from user_admin_dashboard import get_user_admin_html
+    return get_user_admin_html()
 
 def get_evolved_business_html():
     """Generate evolved business dashboard using original retro styles but compact"""
@@ -1034,6 +938,12 @@ async def evolved_dashboard():
 @app.get("/retro/admin", response_class=HTMLResponse)
 async def evolved_admin():
     return get_evolved_admin_html()
+
+@app.get("/retro/pods", response_class=HTMLResponse)
+async def evolved_pods():
+    """Generate evolved pod admin dashboard"""
+    from pod_admin_dashboard import get_pod_admin_html
+    return get_pod_admin_html()
 
 @app.get("/retro/business", response_class=HTMLResponse)
 async def evolved_business():
