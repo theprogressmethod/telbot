@@ -343,21 +343,6 @@ def get_evolved_superadmin_html():
                 inset 0 0 10px rgba(255,0,107,0.05);
         }}
         
-        .status-card::before {{
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, 
-                transparent, 
-                var(--terminal-green), 
-                transparent);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }}
-        
         .status-card:hover {{
             border-color: var(--miami-pink);
             background: linear-gradient(135deg, rgba(255,0,107,0.05), rgba(131,56,236,0.05));
@@ -366,10 +351,6 @@ def get_evolved_superadmin_html():
                 0 0 20px rgba(131,56,236,0.2),
                 inset 0 0 20px rgba(58,134,255,0.1);
             transform: translateY(-1px);
-        }}
-        
-        .status-card:hover::before {{
-            opacity: 1;
         }}
         
         .status-value {{
