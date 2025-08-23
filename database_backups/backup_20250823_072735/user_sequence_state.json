@@ -1,0 +1,41 @@
+[
+  {
+    "id": "05e1673a-1ba5-491b-a2c7-40c2672169c0",
+    "user_id": "934c958c-0eff-4f14-9fa5-c91b534f868c",
+    "sequence_type": "commitment_followup",
+    "current_step": 0,
+    "started_at": "2025-08-14T17:20:37.227206+00:00",
+    "last_message_sent_at": null,
+    "next_message_at": "2025-08-14T23:20:37.227295+00:00",
+    "completed_at": null,
+    "stopped_at": null,
+    "is_active": true,
+    "context": "{}"
+  },
+  {
+    "id": "1139b558-5d37-4321-b64f-ae40cf250686",
+    "user_id": "934c958c-0eff-4f14-9fa5-c91b534f868c",
+    "sequence_type": "onboarding",
+    "current_step": 1,
+    "started_at": "2025-08-14T17:42:18.190982+00:00",
+    "last_message_sent_at": "2025-08-14T17:43:08.44502+00:00",
+    "next_message_at": "2025-08-15T17:43:08.444952+00:00",
+    "completed_at": null,
+    "stopped_at": null,
+    "is_active": true,
+    "context": "{}"
+  },
+  {
+    "id": "c578881b-554a-4e59-814d-333c7fb96f3d",
+    "user_id": "934c958c-0eff-4f14-9fa5-c91b534f868c",
+    "sequence_type": "re_engagement",
+    "current_step": 1,
+    "started_at": "2025-08-14T17:42:18.711866+00:00",
+    "last_message_sent_at": "2025-08-14T17:43:08.803786+00:00",
+    "next_message_at": "2025-08-21T17:43:08.803752+00:00",
+    "completed_at": null,
+    "stopped_at": null,
+    "is_active": true,
+    "context": "{}"
+  }
+]

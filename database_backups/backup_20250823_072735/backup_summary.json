@@ -1,0 +1,15 @@
+{
+  "timestamp": "20250823_072735",
+  "database_url": "https://apfiwfkpdhslfavnncsl.supabase.co",
+  "tables": {
+    "users": 65,
+    "commitments": 233,
+    "pods": 12,
+    "pod_memberships": 20,
+    "user_roles": 5,
+    "nurture_sequences": 0,
+    "user_sequence_state": 3,
+    "meeting_attendance": 41
+  },
+  "total_records": 379
+}
