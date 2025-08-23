@@ -150,13 +150,17 @@ def get_unified_admin_html():
         }}
         
         .title {{
-            color: var(--terminal-green);
             font-size: var(--text-xl);
-            font-weight: 200;
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            background: linear-gradient(135deg, var(--terminal-green), var(--cyber-blue), var(--terminal-green));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             margin-bottom: var(--space-xs);
-            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+            text-shadow: 0 0 40px rgba(0, 255, 136, 0.6);
+            filter: drop-shadow(0 0 20px rgba(58, 134, 255, 0.4));
+            text-transform: uppercase;
         }}
         
         .subtitle {{
@@ -425,6 +429,12 @@ def get_unified_admin_html():
             text-shadow: 0 0 8px rgba(58, 134, 255, 0.5);
         }}
         
+        .placeholder-metric {{
+            text-decoration: line-through;
+            opacity: 0.5;
+            color: var(--gray-600) !important;
+        }}
+        
         .member-list {{
             background: rgba(131,56,236,0.05);
             border: 1px solid rgba(131,56,236,0.1);
@@ -604,7 +614,6 @@ def get_unified_admin_html():
         <div class="dashboard">
             <div class="header">
                 <div class="title">Admin Control</div>
-                <div class="subtitle">Database Management • The Progress Method</div>
             </div>
             
             <div class="tab-nav">
@@ -615,14 +624,23 @@ def get_unified_admin_html():
             <!-- USERS TAB -->
             <div id="users" class="tab-panel active">
                 <div class="search-section">
-                    <div class="search-header">Search Users</div>
-                    <input 
-                        type="text" 
-                        class="search-bar" 
-                        placeholder="Enter user name, email, or ID..."
-                        oninput="searchUsers(this.value)"
-                        onkeypress="if(event.key==='Enter') loadUser(this.value)"
-                    >
+                    <div class="search-header">Find Users</div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+                        <input 
+                            type="text" 
+                            class="search-bar" 
+                            placeholder="Search by name, email, or ID..."
+                            oninput="searchUsers(this.value)"
+                            onkeypress="if(event.key==='Enter') loadUser(this.value)"
+                        >
+                        <select id="userDropdown" class="search-bar" onchange="loadUserById(this.value)" style="appearance: none;">
+                            <option value="">Select User...</option>
+                            <!-- Real users will be populated by JavaScript -->
+                        </select>
+                    </div>
+                    <div style="font-size: var(--text-xs); color: var(--gray-400);">
+                        💡 Use search box or dropdown to find users
+                    </div>
                 </div>
                 
                 <div id="userProfile" class="profile">
@@ -669,24 +687,24 @@ def get_unified_admin_html():
                         <div class="profile-section">
                             <div class="section-title">Performance Metrics</div>
                             <div class="field-row">
-                                <span class="field-label">Call Attendance</span>
-                                <span class="field-value metric-value">87.5% (14/16)</span>
+                                <span class="field-label">~~Call Attendance~~</span>
+                                <span class="field-value metric-value placeholder-metric">~~87.5% (14/16)~~</span>
                             </div>
                             <div class="field-row">
                                 <span class="field-label">Commitments Made</span>
-                                <span class="field-value metric-value">23</span>
+                                <span class="field-value metric-value">12</span>
                             </div>
                             <div class="field-row">
                                 <span class="field-label">Commitments Kept</span>
-                                <span class="field-value metric-value">19 (82.6%)</span>
+                                <span class="field-value metric-value">12 (100%)</span>
                             </div>
                             <div class="field-row">
                                 <span class="field-label">Streak (Current)</span>
-                                <span class="field-value metric-value">7 days</span>
+                                <span class="field-value metric-value">1 day</span>
                             </div>
                             <div class="field-row">
-                                <span class="field-label">Total Revenue</span>
-                                <span class="field-value metric-value">$297</span>
+                                <span class="field-label">~~Total Revenue~~</span>
+                                <span class="field-value metric-value placeholder-metric">~~$297~~</span>
                             </div>
                         </div>
                         
@@ -737,14 +755,23 @@ def get_unified_admin_html():
             <!-- PODS TAB -->
             <div id="pods" class="tab-panel">
                 <div class="search-section">
-                    <div class="search-header">Search Pods</div>
-                    <input 
-                        type="text" 
-                        class="search-bar" 
-                        placeholder="Enter pod name or ID..."
-                        oninput="searchPods(this.value)"
-                        onkeypress="if(event.key==='Enter') loadPod(this.value)"
-                    >
+                    <div class="search-header">Find Pods</div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+                        <input 
+                            type="text" 
+                            class="search-bar" 
+                            placeholder="Search by pod name or ID..."
+                            oninput="searchPods(this.value)"
+                            onkeypress="if(event.key==='Enter') loadPod(this.value)"
+                        >
+                        <select id="podDropdown" class="search-bar" onchange="loadPodById(this.value)" style="appearance: none;">
+                            <option value="">Select Pod...</option>
+                            <!-- Real pods will be populated by JavaScript -->
+                        </select>
+                    </div>
+                    <div style="font-size: var(--text-xs); color: var(--gray-400);">
+                        💡 Use search box or dropdown to find pods
+                    </div>
                 </div>
                 
                 <div id="podProfile" class="profile">
@@ -875,24 +902,24 @@ def get_unified_admin_html():
                         <div class="profile-section">
                             <div class="section-title">Pod Metrics</div>
                             <div class="field-row">
-                                <span class="field-label">Avg Attendance</span>
-                                <span class="field-value metric-value">92.3% (4.6/5)</span>
+                                <span class="field-label">~~Avg Attendance~~</span>
+                                <span class="field-value metric-value placeholder-metric">~~92.3% (4.6/5)~~</span>
                             </div>
                             <div class="field-row">
-                                <span class="field-label">Total Meetings</span>
-                                <span class="field-value metric-value">16</span>
+                                <span class="field-label">~~Total Meetings~~</span>
+                                <span class="field-value metric-value placeholder-metric">~~16~~</span>
                             </div>
                             <div class="field-row">
-                                <span class="field-label">Commitments/Week</span>
-                                <span class="field-value metric-value">8.5</span>
+                                <span class="field-label">~~Commitments/Week~~</span>
+                                <span class="field-value metric-value placeholder-metric">~~8.5~~</span>
                             </div>
                             <div class="field-row">
-                                <span class="field-label">Success Rate</span>
-                                <span class="field-value metric-value">84.7%</span>
+                                <span class="field-label">~~Success Rate~~</span>
+                                <span class="field-value metric-value placeholder-metric">~~84.7%~~</span>
                             </div>
                             <div class="field-row">
-                                <span class="field-label">Engagement Score</span>
-                                <span class="field-value metric-value">8.9/10</span>
+                                <span class="field-label">~~Engagement Score~~</span>
+                                <span class="field-value metric-value placeholder-metric">~~8.9/10~~</span>
                             </div>
                         </div>
                     </div>
@@ -907,6 +934,8 @@ def get_unified_admin_html():
             </div>
         </div>
     </div>
+    
+    <!-- ADMIN_DATA_PLACEHOLDER -->
     
     <script>
         function showTab(tabName) {{
@@ -1044,11 +1073,110 @@ def get_unified_admin_html():
             // In real implementation, would update the member list
         }}
         
-        // Auto-show example profiles on load
-        setTimeout(() => {{
+        // DROPDOWN HANDLERS
+        function loadUserById(userId) {{
+            if (!userId) return;
+            
+            // Show user profile
             document.getElementById('userProfile').classList.add('active');
+            
+            // Update user profile based on selection
+            const userNames = {{
+                '865415132': 'Thomas',
+                'user_2': 'Sarah Chen', 
+                'user_3': 'Mike Rodriguez',
+                'user_4': 'Emma Watson',
+                'user_5': 'David Kim'
+            }};
+            
+            if (userNames[userId]) {{
+                document.getElementById('userName').textContent = userNames[userId];
+                console.log('Loading user from dropdown:', userNames[userId]);
+            }}
+        }}
+        
+        function loadPodById(podId) {{
+            if (!podId) return;
+            
+            // Show pod profile
             document.getElementById('podProfile').classList.add('active');
-        }}, 500);
+            
+            // Update pod profile based on selection
+            const podNames = {{
+                '11111111-1111-1111-1111-111111111111': 'Test Pod Alpha',
+                '22222222-2222-2222-2222-222222222222': 'Healer Business DEV',
+                '0135a55e-bb6b-447e-8446-5d80567436b5': 'Morning Momentum',
+                '43679170-a8a5-44ab-a770-31ef9fbb08f9': 'Evening Excellence',
+                '8c7375d5-0316-44ac-b5b3-2697e1bfb7b0': 'Fitness Focus Pod',
+                '96ba5703-297f-4409-9fb5-21f0c434be3f': 'Creative Collective'
+            }};
+            
+            if (podNames[podId]) {{
+                document.getElementById('podName').textContent = podNames[podId];
+                console.log('Loading pod from dropdown:', podNames[podId]);
+            }}
+        }}
+        
+        // POPULATE REAL DATA DROPDOWNS
+        function populateDropdowns() {{
+            console.log('🔧 populateDropdowns() called');
+            console.log('📊 window.realUsers:', window.realUsers ? window.realUsers.length : 'undefined');
+            console.log('🏠 window.realPods:', window.realPods ? window.realPods.length : 'undefined');
+            
+            // Populate users dropdown
+            const userDropdown = document.getElementById('userDropdown');
+            console.log('🔧 userDropdown element:', userDropdown);
+            
+            if (window.realUsers && userDropdown) {{
+                userDropdown.innerHTML = '<option value="">Select User...</option>';
+                
+                window.realUsers.forEach(user => {{
+                    const option = document.createElement('option');
+                    option.value = user.telegram_user_id;
+                    option.textContent = `${{user.name}} (TG: ${{user.telegram_user_id}})`;
+                    userDropdown.appendChild(option);
+                }});
+                
+                console.log('✅ Populated users dropdown with', window.realUsers.length, 'real users');
+            }} else {{
+                console.log('❌ Could not populate users dropdown - missing data or element');
+            }}
+            
+            // Populate pods dropdown  
+            const podDropdown = document.getElementById('podDropdown');
+            console.log('🔧 podDropdown element:', podDropdown);
+            
+            if (window.realPods && podDropdown) {{
+                podDropdown.innerHTML = '<option value="">Select Pod...</option>';
+                
+                window.realPods.forEach(pod => {{
+                    const option = document.createElement('option');
+                    option.value = pod.id;
+                    option.textContent = `${{pod.name}} (${{pod.members || '0'}}/6)`;
+                    podDropdown.appendChild(option);
+                }});
+                
+                console.log('✅ Populated pods dropdown with', window.realPods.length, 'real pods');
+            }} else {{
+                console.log('❌ Could not populate pods dropdown - missing data or element');
+            }}
+        }}
+        
+        // Auto-show example profiles on load
+        document.addEventListener('DOMContentLoaded', function() {{
+            console.log('🔧 DOM loaded, attempting to populate dropdowns...');
+            setTimeout(() => {{
+                populateDropdowns();
+                document.getElementById('userProfile').classList.add('active');
+                document.getElementById('podProfile').classList.add('active');
+            }}, 100);
+        }});
+        
+        // Fallback for late script loading
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {{
+            console.log('🔧 DOM already ready, populating dropdowns immediately...');
+            setTimeout(populateDropdowns, 100);
+        }}
     </script>
 </body>
 </html>
