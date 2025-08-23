@@ -265,7 +265,7 @@ class DashboardIntegration:
                 "first_name, telegram_user_id, created_at"
             ).not_.is_("telegram_user_id", "null").order(
                 "created_at", desc=True
-            ).limit(10).execute()
+            ).execute()
             
             users = []
             for user in result.data:
@@ -284,7 +284,9 @@ class DashboardIntegration:
         """Get real pods from database for dropdown"""
         try:
             pods_data = await self.pod_system.list_all_pods()
-            return pods_data[:10]  # Limit to 10 for dropdown
+            # Sort by creation date (newest first) and limit to 15 for dropdown
+            sorted_pods = sorted(pods_data, key=lambda x: x.get('created_at', ''), reverse=True)
+            return sorted_pods[:15]  # Show 15 most recent pods
         except Exception as e:
             logger.error(f"Error getting real pods: {e}")
             return []

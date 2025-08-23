@@ -699,8 +699,8 @@ def get_unified_admin_html():
                                 <span class="field-value metric-value">12 (100%)</span>
                             </div>
                             <div class="field-row">
-                                <span class="field-label">Streak (Current)</span>
-                                <span class="field-value metric-value">1 day</span>
+                                <span class="field-label">~~Streak (Current)~~</span>
+                                <span class="field-value metric-value placeholder-metric">~~1 day~~</span>
                             </div>
                             <div class="field-row">
                                 <span class="field-label">~~Total Revenue~~</span>
@@ -709,7 +709,7 @@ def get_unified_admin_html():
                         </div>
                         
                         <div class="profile-section">
-                            <div class="section-title">Recent Nurture Communications</div>
+                            <div class="section-title">~~Recent Nurture Communications~~</div>
                             <div class="nurture-log">
                                 <div class="log-date">2024-08-22 08:00</div>
                                 <div class="log-content">Daily commitment reminder sent</div>
@@ -894,7 +894,10 @@ def get_unified_admin_html():
                                 </div>
                             </div>
                             <div class="add-member-row">
-                                <input type="text" class="add-input" placeholder="Enter user email or ID..." id="newMemberInput">
+                                <select class="add-input" id="newMemberSelect">
+                                    <option value="">Select User to Add...</option>
+                                    <!-- Users will be populated by JavaScript -->
+                                </select>
                                 <button class="add-btn" onclick="addMember()">Add</button>
                             </div>
                         </div>
@@ -1055,66 +1058,227 @@ def get_unified_admin_html():
         }}
         
         function addMember() {{
-            const input = document.getElementById('newMemberInput');
-            const memberInfo = input.value.trim();
+            const select = document.getElementById('newMemberSelect');
+            const userId = select.value;
             
-            if (!memberInfo) {{
-                alert('Please enter a user email or ID');
+            if (!userId) {{
+                alert('Please select a user to add');
                 return;
             }}
             
-            // Simulate API call to add member
-            alert('Member added successfully!');
-            console.log('Adding member:', memberInfo);
+            // Get current pod ID from the dropdown or URL
+            const podDropdown = document.getElementById('podDropdown');
+            const podId = podDropdown ? podDropdown.value : null;
             
-            // Clear input
-            input.value = '';
+            if (!podId) {{
+                alert('No pod selected');
+                return;
+            }}
             
-            // In real implementation, would update the member list
+            console.log('🔄 Adding user', userId, 'to pod', podId);
+            
+            // Make API call to add member
+            fetch(`/api/crud/pods/${{podId}}/members/${{userId}}`, {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }}
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                if (data.success) {{
+                    alert('Member added successfully!');
+                    console.log('✅ Member added:', data);
+                    
+                    // Clear selection
+                    select.value = '';
+                    
+                    // Reload the pod data to show updated member list
+                    loadPodById(podId);
+                }} else {{
+                    alert('Error adding member: ' + (data.message || 'Unknown error'));
+                    console.error('❌ Error adding member:', data);
+                }}
+            }})
+            .catch(error => {{
+                alert('Network error adding member');
+                console.error('❌ Network error:', error);
+            }});
         }}
         
         // DROPDOWN HANDLERS
         function loadUserById(userId) {{
             if (!userId) return;
             
-            // Show user profile
+            console.log('🔄 Loading user data for ID:', userId);
+            
+            // Show user profile and loading state
             document.getElementById('userProfile').classList.add('active');
+            document.getElementById('userName').textContent = 'Loading...';
             
-            // Update user profile based on selection
-            const userNames = {{
-                '865415132': 'Thomas',
-                'user_2': 'Sarah Chen', 
-                'user_3': 'Mike Rodriguez',
-                'user_4': 'Emma Watson',
-                'user_5': 'David Kim'
-            }};
-            
-            if (userNames[userId]) {{
-                document.getElementById('userName').textContent = userNames[userId];
-                console.log('Loading user from dropdown:', userNames[userId]);
-            }}
+            // Fetch real user data from API
+            fetch(`/api/crud/users/${{userId}}`)
+                .then(response => response.json())
+                .then(data => {{
+                    if (data.success) {{
+                        const user = data.data;
+                        console.log('✅ User data loaded:', user);
+                        
+                        // Update user profile with real data
+                        document.getElementById('userName').textContent = user.first_name || 'Unknown User';
+                        
+                        // Update user fields with real data
+                        const emailField = document.querySelector('#userProfile input[type="email"]');
+                        if (emailField) emailField.value = user.email || '';
+                        
+                        // Update join date
+                        const joinDateField = document.querySelector('#userProfile .field-row:nth-child(4) .field-value');
+                        if (joinDateField) joinDateField.textContent = user.created_at ? user.created_at.split('T')[0] : 'Unknown';
+                        
+                        // Update telegram ID in profile header
+                        const profileId = document.querySelector('#userProfile .profile-id');
+                        if (profileId) profileId.textContent = `TELEGRAM ID: ${{user.telegram_user_id || 'N/A'}}`;
+                        
+                        // Fetch user commitments for metrics
+                        return fetch(`/api/crud/commitments/user/${{userId}}`);
+                    }} else {{
+                        throw new Error(data.message || 'User not found');
+                    }}
+                }})
+                .then(response => response.json())
+                .then(commitmentData => {{
+                    if (commitmentData.success) {{
+                        const commitments = commitmentData.data;
+                        const completedCommitments = commitments.filter(c => c.status === 'completed').length;
+                        
+                        console.log('✅ User commitments loaded:', commitments.length);
+                        
+                        // Update commitment metrics
+                        const commitmentsMadeField = document.querySelector('#userProfile .field-row:nth-child(2) .metric-value');
+                        if (commitmentsMadeField) commitmentsMadeField.textContent = commitments.length;
+                        
+                        const commitmentsKeptField = document.querySelector('#userProfile .field-row:nth-child(3) .metric-value');
+                        if (commitmentsKeptField) {{
+                            const rate = commitments.length > 0 ? Math.round((completedCommitments / commitments.length) * 100) : 0;
+                            commitmentsKeptField.textContent = `${{completedCommitments}} (${{rate}}%)`;
+                        }}
+                    }}
+                }})
+                .catch(error => {{
+                    console.error('❌ Error loading user data:', error);
+                    document.getElementById('userName').textContent = 'Error Loading User';
+                    
+                    // Show error message
+                    const profileId = document.querySelector('#userProfile .profile-id');
+                    if (profileId) profileId.textContent = `ERROR: ${{error.message}}`;
+                }});
         }}
         
         function loadPodById(podId) {{
             if (!podId) return;
             
-            // Show pod profile
+            console.log('🔄 Loading pod data for ID:', podId);
+            
+            // Show pod profile and loading state
             document.getElementById('podProfile').classList.add('active');
+            document.getElementById('podName').textContent = 'Loading...';
             
-            // Update pod profile based on selection
-            const podNames = {{
-                '11111111-1111-1111-1111-111111111111': 'Test Pod Alpha',
-                '22222222-2222-2222-2222-222222222222': 'Healer Business DEV',
-                '0135a55e-bb6b-447e-8446-5d80567436b5': 'Morning Momentum',
-                '43679170-a8a5-44ab-a770-31ef9fbb08f9': 'Evening Excellence',
-                '8c7375d5-0316-44ac-b5b3-2697e1bfb7b0': 'Fitness Focus Pod',
-                '96ba5703-297f-4409-9fb5-21f0c434be3f': 'Creative Collective'
-            }};
-            
-            if (podNames[podId]) {{
-                document.getElementById('podName').textContent = podNames[podId];
-                console.log('Loading pod from dropdown:', podNames[podId]);
-            }}
+            // Fetch real pod data from API
+            fetch(`/api/crud/pods/${{podId}}`)
+                .then(response => response.json())
+                .then(data => {{
+                    if (data.success) {{
+                        const pod = data.data;
+                        console.log('✅ Pod data loaded:', pod);
+                        
+                        // Update pod profile with real data
+                        document.getElementById('podName').textContent = pod.name || 'Unknown Pod';
+                        
+                        // Update pod ID in profile header
+                        const profileId = document.querySelector('#podProfile .profile-id');
+                        if (profileId) profileId.textContent = `POD ID: ${{podId}}`;
+                        
+                        // Update pod settings
+                        const podNameField = document.querySelector('#podProfile .profile-section:nth-child(1) input[type="text"]');
+                        if (podNameField) podNameField.value = pod.name || '';
+                        
+                        const maxMembersField = document.querySelector('#podProfile input[type="number"]');
+                        if (maxMembersField) maxMembersField.value = pod.max_members || 6;
+                        
+                        // Update created date - find by label text
+                        const createdDateField = Array.from(document.querySelectorAll('#podProfile .field-row')).find(row => 
+                            row.textContent.includes('Created Date')
+                        )?.querySelector('.field-value');
+                        if (createdDateField) createdDateField.textContent = pod.created_at ? pod.created_at.split('T')[0] : 'Unknown';
+                        
+                        // Update meeting time
+                        const meetingTimeField = document.querySelector('#podProfile input[type="time"]');
+                        if (meetingTimeField && pod.meeting_time) meetingTimeField.value = pod.meeting_time;
+                        
+                        // Populate facilitator dropdown with pod members
+                        const facilitatorSelect = Array.from(document.querySelectorAll('#podProfile select.field-input')).find(select => 
+                            select.parentElement.textContent.includes('Facilitator')
+                        );
+                        if (facilitatorSelect && pod.members) {{
+                            facilitatorSelect.innerHTML = '<option value="">Select Facilitator</option>';
+                            pod.members.forEach(member => {{
+                                const option = document.createElement('option');
+                                option.value = member.user_id;
+                                option.textContent = member.users?.first_name || 'Unknown Member';
+                                facilitatorSelect.appendChild(option);
+                            }});
+                        }}
+                        
+                        // Populate add member dropdown with real users
+                        const addMemberSelect = document.getElementById('newMemberSelect');
+                        if (addMemberSelect && window.realUsers) {{
+                            addMemberSelect.innerHTML = '<option value="">Select User to Add...</option>';
+                            window.realUsers.forEach(user => {{
+                                const option = document.createElement('option');
+                                option.value = user.telegram_user_id;
+                                option.textContent = `${{user.name}} (TG: ${{user.telegram_user_id}})`;
+                                addMemberSelect.appendChild(option);
+                            }});
+                        }}
+                        
+                        // Update member list
+                        const memberListContainer = document.querySelector('#podProfile .member-list');
+                        if (memberListContainer && pod.members) {{
+                            memberListContainer.innerHTML = '';
+                            
+                            pod.members.forEach(member => {{
+                                const memberDiv = document.createElement('div');
+                                memberDiv.className = 'member-item';
+                                memberDiv.innerHTML = `
+                                    <div>
+                                        <div class="member-name">${{member.users?.first_name || 'Unknown'}}</div>
+                                        <div class="member-role">Member</div>
+                                    </div>
+                                    <button class="remove-btn" onclick="removeMember('${{member.user_id}}')">Remove</button>
+                                `;
+                                memberListContainer.appendChild(memberDiv);
+                            }});
+                            
+                            // Update member count in section title
+                            const memberSectionTitle = Array.from(document.querySelectorAll('#podProfile .section-title')).find(title => 
+                                title.textContent.includes('Members')
+                            );
+                            if (memberSectionTitle) {{
+                                const memberCount = pod.members.length;
+                                const maxMembers = pod.max_members || 6;
+                                memberSectionTitle.textContent = `Pod Members (${{memberCount}}/${{maxMembers}})`;
+                            }}
+                        }}
+                    }} else {{
+                        throw new Error(data.message || 'Pod not found');
+                    }}
+                }})
+                .catch(error => {{
+                    console.error('❌ Error loading pod data:', error);
+                    document.getElementById('podName').textContent = 'Error Loading Pod';
+                    
+                    // Show error message
+                    const profileId = document.querySelector('#podProfile .profile-id');
+                    if (profileId) profileId.textContent = `ERROR: ${{error.message}}`;
+                }});
         }}
         
         // POPULATE REAL DATA DROPDOWNS
@@ -1162,21 +1326,38 @@ def get_unified_admin_html():
             }}
         }}
         
+        // Multiple attempts to ensure dropdowns populate
+        function ensureDropdownsPopulated() {{
+            console.log('🔧 ensureDropdownsPopulated() called');
+            
+            // Force immediate population
+            populateDropdowns();
+            
+            // Additional attempts with delays
+            setTimeout(populateDropdowns, 100);
+            setTimeout(populateDropdowns, 500);
+            setTimeout(populateDropdowns, 1000);
+        }}
+        
         // Auto-show example profiles on load
         document.addEventListener('DOMContentLoaded', function() {{
             console.log('🔧 DOM loaded, attempting to populate dropdowns...');
-            setTimeout(() => {{
-                populateDropdowns();
-                document.getElementById('userProfile').classList.add('active');
-                document.getElementById('podProfile').classList.add('active');
-            }}, 100);
+            ensureDropdownsPopulated();
+            document.getElementById('userProfile').classList.add('active');
+            document.getElementById('podProfile').classList.add('active');
         }});
         
         // Fallback for late script loading
         if (document.readyState === 'complete' || document.readyState === 'interactive') {{
             console.log('🔧 DOM already ready, populating dropdowns immediately...');
-            setTimeout(populateDropdowns, 100);
+            ensureDropdownsPopulated();
         }}
+        
+        // Force population on window load as final fallback
+        window.addEventListener('load', function() {{
+            console.log('🔧 Window loaded, final dropdown population attempt...');
+            ensureDropdownsPopulated();
+        }});
     </script>
 </body>
 </html>
