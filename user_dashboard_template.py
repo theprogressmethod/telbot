@@ -137,21 +137,6 @@ def get_user_dashboard_html(user_data: dict) -> str:
             position: relative;
         }}
         
-        body::before {{
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: 
-                radial-gradient(circle at 20% 80%, rgba(255, 0, 107, 0.015) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(131, 56, 236, 0.015) 0%, transparent 50%),
-                radial-gradient(circle at 40% 40%, rgba(58, 134, 255, 0.01) 0%, transparent 50%);
-            pointer-events: none;
-            z-index: -10;
-        }}
-        
         .frame {{
             min-height: 100vh;
             background: linear-gradient(135deg, 

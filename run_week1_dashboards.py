@@ -25,6 +25,9 @@ from dashboard_routes_1_0 import register_week1_dashboard_routes, dashboard_heal
 from retro_evolved_dashboard import get_evolved_superadmin_html
 from fastapi.responses import HTMLResponse
 
+# Import CRUD routes
+from dashboard_crud_routes import create_crud_router
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -73,6 +76,12 @@ async def startup_event():
         
         logger.info("✅ Dashboard routes registered")
         
+        # Add CRUD routes for database editing
+        crud_router = create_crud_router(supabase, pod_system)
+        app.include_router(crud_router)
+        
+        logger.info("✅ CRUD routes registered")
+        
         # Add retro dashboard routes
         app.add_api_route(
             "/retro/superadmin", 
@@ -90,6 +99,12 @@ async def startup_event():
         logger.info("   • GET /api/dashboard/123 - User API")
         logger.info("   • GET /retro/superadmin - SuperAdmin dashboard")
         logger.info("   • GET /health - Health check")
+        logger.info("📝 CRUD API endpoints:")
+        logger.info("   • GET /api/crud/users - List all users")
+        logger.info("   • PUT /api/crud/users/{id} - Update user")
+        logger.info("   • GET /api/crud/pods - List all pods")
+        logger.info("   • PUT /api/crud/pods/{id} - Update pod")
+        logger.info("   • GET /api/crud/commitments - List commitments")
         
     except Exception as e:
         logger.error(f"❌ Startup error: {e}")

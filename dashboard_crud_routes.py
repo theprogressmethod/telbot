@@ -22,7 +22,9 @@ class UserUpdateRequest(BaseModel):
 class PodUpdateRequest(BaseModel):
     name: Optional[str] = None
     status: Optional[str] = None
-    meeting_time: Optional[str] = None
+    time_utc: Optional[str] = None
+    day_of_week: Optional[int] = None
+    timezone: Optional[str] = None
     max_members: Optional[int] = None
 
 class CommitmentUpdateRequest(BaseModel):
@@ -47,7 +49,7 @@ def create_crud_router(supabase_client, pod_system):
     
     @router.get("/users/{user_id}")
     async def get_user(user_id: str):
-        """Get specific user by telegram_user_id or UUID"""
+        """Get specific user by telegram_user_id or UUID with roles"""
         try:
             # Try telegram_user_id first
             if user_id.isdigit():
@@ -58,7 +60,16 @@ def create_crud_router(supabase_client, pod_system):
             if not result.data:
                 raise HTTPException(status_code=404, detail="User not found")
             
-            return {"success": True, "data": result.data[0]}
+            user_data = result.data[0]
+            
+            # Get user roles
+            roles_result = supabase_client.table("user_roles").select("role_type, granted_at").eq(
+                "user_id", user_data["id"]
+            ).eq("is_active", True).execute()
+            
+            user_data["roles"] = [{"role": role["role_type"], "granted_at": role["granted_at"]} for role in roles_result.data]
+            
+            return {"success": True, "data": user_data}
         except Exception as e:
             logger.error(f"Error fetching user {user_id}: {e}")
             raise HTTPException(status_code=500, detail=str(e))
@@ -213,8 +224,7 @@ def create_crud_router(supabase_client, pod_system):
             result = supabase_client.table("pod_memberships").insert({
                 "pod_id": pod_id,
                 "user_id": user_uuid,
-                "is_active": True,
-                "role": "member"
+                "is_active": True
             }).execute()
             
             return {"success": True, "data": result.data[0], "message": "User added to pod successfully"}
@@ -246,6 +256,84 @@ def create_crud_router(supabase_client, pod_system):
             return {"success": True, "message": "User removed from pod successfully"}
         except Exception as e:
             logger.error(f"Error removing user {user_id} from pod {pod_id}: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    # USER ROLES MANAGEMENT
+    @router.get("/roles")
+    async def get_all_roles():
+        """Get all available role types"""
+        try:
+            # Common role types in the system
+            role_types = [
+                {"role": "user", "description": "Basic user"},
+                {"role": "paid", "description": "Premium user"},
+                {"role": "pod_member", "description": "Pod member"},
+                {"role": "pod_facilitator", "description": "Pod facilitator"},
+                {"role": "admin", "description": "Administrator"},
+                {"role": "superadmin", "description": "Super administrator"}
+            ]
+            return {"success": True, "data": role_types}
+        except Exception as e:
+            logger.error(f"Error fetching roles: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @router.post("/users/{user_id}/roles/{role}")
+    async def grant_user_role(user_id: str, role: str):
+        """Grant a role to a user"""
+        try:
+            # Get user UUID if telegram_user_id provided
+            if user_id.isdigit():
+                user_result = supabase_client.table("users").select("id").eq("telegram_user_id", int(user_id)).execute()
+                if not user_result.data:
+                    raise HTTPException(status_code=404, detail="User not found")
+                user_uuid = user_result.data[0]["id"]
+            else:
+                user_uuid = user_id
+            
+            # Check if role already exists
+            existing = supabase_client.table("user_roles").select("id").eq("user_id", user_uuid).eq("role_type", role).eq("is_active", True).execute()
+            
+            if existing.data:
+                return {"success": False, "message": "User already has this role"}
+            
+            # Grant role
+            from datetime import datetime
+            result = supabase_client.table("user_roles").insert({
+                "user_id": user_uuid,
+                "role_type": role,
+                "is_active": True,
+                "granted_at": datetime.now().isoformat()
+            }).execute()
+            
+            return {"success": True, "data": result.data[0], "message": f"Role '{role}' granted successfully"}
+        except Exception as e:
+            logger.error(f"Error granting role {role} to user {user_id}: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @router.delete("/users/{user_id}/roles/{role}")
+    async def revoke_user_role(user_id: str, role: str):
+        """Revoke a role from a user"""
+        try:
+            # Get user UUID if telegram_user_id provided
+            if user_id.isdigit():
+                user_result = supabase_client.table("users").select("id").eq("telegram_user_id", int(user_id)).execute()
+                if not user_result.data:
+                    raise HTTPException(status_code=404, detail="User not found")
+                user_uuid = user_result.data[0]["id"]
+            else:
+                user_uuid = user_id
+            
+            # Revoke role (deactivate)
+            result = supabase_client.table("user_roles").update({
+                "is_active": False
+            }).eq("user_id", user_uuid).eq("role_type", role).execute()
+            
+            if not result.data:
+                raise HTTPException(status_code=404, detail="Role assignment not found")
+            
+            return {"success": True, "message": f"Role '{role}' revoked successfully"}
+        except Exception as e:
+            logger.error(f"Error revoking role {role} from user {user_id}: {e}")
             raise HTTPException(status_code=500, detail=str(e))
     
     return router
