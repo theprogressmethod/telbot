@@ -132,9 +132,6 @@ except ValueError as e:
 bot = Bot(token=config.bot_token)
 dp = Dispatcher(storage=MemoryStorage())
 
-# Initialize SMART 3-retry system after bot is created
-smart_3_retry = Smart3RetrySystem(smart_analyzer, bot)
-
 # Test database connection
 try:
     supabase: Client = create_client(config.supabase_url, config.supabase_key)
@@ -419,10 +416,6 @@ class DatabaseManager:
 # Initialize analysis engine with secure config
 smart_analyzer = SmartAnalysis(config)
 
-# Initialize SMART 3-retry system for Week 1 enhancement
-from smart_3_retry_system import Smart3RetrySystem
-smart_3_retry = None  # Will be initialized after bot is created
-
 # Initialize role manager
 from user_role_manager import UserRoleManager
 from user_analytics import UserAnalytics
@@ -464,9 +457,6 @@ pod_tracker = PodWeekTracker(supabase)
 
 # Temporary storage for callback data (use Redis in production)
 temp_storage = {}
-
-# Storage for 3-retry system state (track users awaiting retry input)
-retry_input_state = {}
 
 class CommitmentTracker:
     """Advanced commitment tracking with reminders and accountability features"""
@@ -937,22 +927,21 @@ async def aitest_handler(message: Message):
 
 @dp.message(Command("commit"))
 async def commit_handler(message: Message):
-    """Handle /commit command with SMART 3-retry enhancement system"""
+    """Handle /commit command with entertaining loading experience and timeout"""
     # Extract commitment text
     command_parts = message.text.split(maxsplit=1)
     
     if len(command_parts) < 2:
         await message.answer(
             "Please provide a commitment after /commit\n\n"
-            "Example: /commit Read for 30 minutes today\n\n"
-            "💡 **Tip:** The more specific, the better! Include what, how much, and when."
+            "Example: /commit Read for 30 minutes"
         )
         return
     
     commitment_text = command_parts[1].strip()
     user_id = message.from_user.id
     
-    logger.info(f"🎯 Processing commitment with 3-retry system: {commitment_text}")
+    logger.info(f"🎯 Processing commitment from user {user_id}: {commitment_text}")
     
     # Test database before proceeding
     if not await DatabaseManager.test_database():
@@ -963,48 +952,76 @@ async def commit_handler(message: Message):
     loading_message = await create_loading_experience(message, commitment_text)
     
     try:
-        # Use new SMART 3-retry enhancement system
-        result = await smart_3_retry.process_commitment_with_retries(
-            user_id=user_id,
-            commitment_text=commitment_text,
-            message_to_edit=loading_message,
-            chat_id=message.chat.id
+        # Analyze the commitment with SMART criteria (with timeout)
+        analysis = await asyncio.wait_for(
+            smart_analyzer.analyze_commitment(commitment_text, message.chat.id),
+            timeout=15.0  # 15 second timeout
         )
         
-        # Handle the result
-        if result and result.get('success', False):
-            # Save the commitment
+        # Update with final result
+        await finalize_loading_experience(loading_message, analysis)
+        
+        is_smart_enough = analysis["score"] >= 8
+        
+        if is_smart_enough:
+            # Save directly as it's already SMART enough
             success = await DatabaseManager.save_commitment(
                 telegram_user_id=user_id,
-                commitment=result['commitment'],
-                original_commitment=result['original_commitment'],
-                smart_score=result['score']
+                commitment=commitment_text,
+                original_commitment=commitment_text,
+                smart_score=analysis["score"]
             )
             
             if success:
                 # Trigger nurture sequences
                 await _trigger_commitment_sequences(user_id)
-                logger.info(f"✅ Commitment saved with 3-retry system: {result.get('retry_count', 0)} retries")
+                
+                # Replace the loading message with success
+                await loading_message.edit_text(
+                    f"✅ Great commitment! (SMART Score: {analysis['score']}/10)\n\n"
+                    f"📝 \"{commitment_text}\"\n\n"
+                    f"Added to your commitments! Use /done when you complete it."
+                )
             else:
                 await loading_message.edit_text("❌ Error saving commitment. Please check /dbtest and try again.")
-        
-        # If result is None or awaiting_retry, the 3-retry system is handling the interaction
-        
-    except Exception as e:
-        logger.error(f"❌ Error in enhanced commit handler: {e}")
-        await loading_message.edit_text(
-            f"❌ Something went wrong! Let me save your commitment anyway:\n\n"
-            f"📝 \"{commitment_text}\"\n\n"
-            f"Added to your list!"
-        )
-        
-        # Try to save anyway
-        await DatabaseManager.save_commitment(
-            telegram_user_id=user_id,
-            commitment=commitment_text,
-            original_commitment=commitment_text,
-            smart_score=5  # Fallback score
-        )
+        else:
+            # Offer improvement options
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="💡 Use SMART version",
+                    callback_data=f"save_smart_{user_id}_{analysis['score']}"
+                )],
+                [InlineKeyboardButton(
+                    text="📝 Keep original",
+                    callback_data=f"save_original_{user_id}_{analysis['score']}"
+                )],
+                [InlineKeyboardButton(
+                    text="❌ Cancel",
+                    callback_data="cancel_commit"
+                )]
+            ])
+            
+            improvement_text = (
+                f"🤔 Your commitment could be more SMART! (Score: {analysis['score']}/10)\n\n"
+                f"**Original:** \"{commitment_text}\"\n"
+                f"**SMART Version:** \"{analysis['smartVersion']}\"\n\n"
+                f"**Why improve?** {analysis['feedback']}\n\n"
+                f"Which version would you like to save?"
+            )
+            
+            # Store commitment data for callback
+            temp_storage[f"commit_{user_id}"] = {
+                "original": commitment_text,
+                "smart": analysis['smartVersion'],
+                "score": analysis['score']
+            }
+            
+            # Replace loading message with improvement options
+            await loading_message.edit_text(
+                improvement_text,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
             
     except asyncio.TimeoutError:
         logger.error("❌ AI analysis timed out")
@@ -1277,27 +1294,6 @@ async def cancel_commit_callback(callback: CallbackQuery):
         "Commitment cancelled. Use /commit when you're ready to add a new commitment."
     )
     await callback.answer()
-
-# SMART 3-Retry System Callback Handlers
-@dp.callback_query(F.data.startswith("retry_"))
-async def retry_callback_handler(callback: CallbackQuery):
-    """Handle all retry system callbacks"""
-    try:
-        result = await smart_3_retry.handle_retry_callback(callback, callback.data)
-        
-        if result and result.get('awaiting_input'):
-            # User wants to manually improve - track state
-            retry_key = result['retry_key']
-            user_id = callback.from_user.id
-            retry_input_state[user_id] = retry_key
-            
-        elif result and result.get('success'):
-            # Commitment was saved, trigger sequences
-            await _trigger_commitment_sequences(callback.from_user.id)
-            
-    except Exception as e:
-        logger.error(f"❌ Error in retry callback handler: {e}")
-        await callback.answer("Something went wrong. Please try /commit again.", show_alert=True)
 
 @dp.message(Command("feedback"))
 async def feedback_handler(message: Message):
@@ -1936,51 +1932,11 @@ async def streakboost_handler(message: Message):
         logger.error(f"Error in streakboost handler: {e}")
         await message.answer("❌ Error getting streak tips. Please try again.")
 
-# SMART 3-Retry System Message Handler (must come before general text handler)
-async def handle_retry_input(message: Message) -> bool:
-    """Handle retry input from users - returns True if handled"""
-    user_id = message.from_user.id
-    
-    if user_id in retry_input_state:
-        retry_key = retry_input_state[user_id]
-        
-        try:
-            result = await smart_3_retry.handle_retry_input(message, retry_key)
-            
-            if result and result.get('success'):
-                # Save the commitment
-                success = await DatabaseManager.save_commitment(
-                    telegram_user_id=user_id,
-                    commitment=result['commitment'],
-                    original_commitment=result['original_commitment'],
-                    smart_score=result['score']
-                )
-                
-                if success:
-                    await _trigger_commitment_sequences(user_id)
-                    logger.info(f"✅ Retry input saved: {result.get('retry_count', 0)} retries")
-            
-            # Clean up state
-            del retry_input_state[user_id]
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Error handling retry input: {e}")
-            del retry_input_state[user_id]
-            await message.answer("❌ Something went wrong. Please try /commit again.")
-            return True
-    
-    return False
-
 @dp.message()
 async def handle_text_messages(message: Message):
     """Handle all other text messages with enhanced onboarding"""
     user_id = message.from_user.id
     text = message.text.lower()
-    
-    # First check if this is retry input
-    if await handle_retry_input(message):
-        return
     
     # First, check if user needs onboarding data
     needs_onboarding = await onboarding_system.check_user_needs_onboarding_data(user_id)
