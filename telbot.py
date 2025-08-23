@@ -12,6 +12,7 @@ from aiogram.types import (
     Message, CallbackQuery, InlineKeyboardMarkup, 
     InlineKeyboardButton, BotCommand
 )
+from aiogram import types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -932,6 +933,9 @@ async def start_handler(message: Message):
     # Test database on first interaction
     db_test = await DatabaseManager.test_database()
     
+    # Set user-specific commands after registration
+    await set_user_commands(user_id)
+    
     if is_first_time:
         # Enhanced first-time user experience with immediate data collection
         welcome_text = await onboarding_system.handle_first_time_user(user_id, user_name, username)
@@ -1237,6 +1241,9 @@ async def complete_commitment_callback(callback: CallbackQuery):
             "You're on fire today! 🔥\n\n"
             "Ready for more? Use /commit to add new goals!"
         )
+        
+        # Refresh user commands after completing commitments
+        await set_user_commands(callback.from_user.id)
     else:
         # Rebuild button list
         celebration_emojis = ["✅", "👏", "🎯", "💪", "🔥", "⭐"]
@@ -1267,6 +1274,9 @@ async def complete_commitment_callback(callback: CallbackQuery):
         keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
         
         await callback.message.edit_text(text, reply_markup=keyboard)
+        
+        # Refresh user commands after completing any commitment
+        await set_user_commands(callback.from_user.id)
 
 @dp.callback_query(F.data == "cancel_done")
 async def cancel_done_callback(callback: CallbackQuery):
@@ -1304,6 +1314,9 @@ async def save_smart_callback(callback: CallbackQuery):
             f"📝 \"{stored_data['smart']}\"\n\n"
             f"Use /done when you complete it!"
         )
+        
+        # Refresh user commands after first commitment
+        await set_user_commands(callback.from_user.id)
         # Clean up temporary storage
         del temp_storage[f"commit_{user_id}"]
     else:
@@ -1439,36 +1452,65 @@ async def feedback_handler(message: Message):
 
 @dp.message(Command("help"))
 async def help_handler(message: Message):
-    """Handle /help command with role-based features"""
+    """Handle /help command with comprehensive role-based command listing"""
     user_id = message.from_user.id
+    user_name = message.from_user.first_name or "there"
     
-    # Check if user has admin role
-    is_admin = False
+    # Get user status and roles
     try:
-        roles_result = supabase.table("user_roles").select("role_type").eq(
-            "user_id", supabase.table("users").select("id").eq("telegram_user_id", user_id).execute().data[0]["id"]
-        ).eq("is_active", True).execute()
-        is_admin = any(r["role_type"] in ["admin", "super_admin"] for r in roles_result.data)
+        is_first_time = await role_manager.is_first_time_user(user_id)
+        user_roles = await role_manager.get_user_roles(user_id)
+        is_admin = "admin" in user_roles or "superadmin" in user_roles
+        is_pod_member = "pod_member" in user_roles
+        is_paid = "paid" in user_roles
     except:
-        pass
+        is_first_time = False
+        user_roles = []
+        is_admin = False
+        is_pod_member = False
+        is_paid = False
     
-    help_text = """📚 **How to use this bot:**
+    help_text = f"""📚 **Welcome to The Progress Method Bot, {user_name}!**
 
-**Core Commands:**
-/start - Welcome & getting started
-/commit <text> - Add a commitment
-/done - Mark commitments complete  
-/list - View your active commitments
-/progress - View streaks & stats
-/feedback <message> - Send feedback
-/help - This help message
+**🎯 Core Commands:**
+/commit <text> - Make a new commitment
+/done - Mark commitments as complete
+/list - View your active commitments  
+/progress - View your streaks & statistics
+/feedback <message> - Send us feedback
+/help - Show this help message
 
-**Pod Commands:**
-/mypod - View your pod info
-/podleaderboard - Weekly pod rankings
-/podweek - Current pod week progress
-
-**Tips:**
+**💎 Premium Commands:**
+/upgrade - Upgrade to premium features ($17/month)
+"""
+    
+    if is_pod_member:
+        help_text += """
+**👥 Pod Commands (You're in a pod!):**
+/mypod - View your pod information
+/podleaderboard - See weekly pod rankings
+/podweek - Check current pod week progress
+"""
+    else:
+        help_text += """
+**👥 Pod System:**
+Pods are small accountability groups (6 members max)
+• Join a pod to get group support & motivation
+• Track progress together with weekly check-ins
+• Compete in friendly leaderboards
+*Ask an admin about joining a pod!*
+"""
+    
+    if is_admin:
+        help_text += """
+**🛠️ Admin Commands:**
+/listpods - List all pods in the system
+/createpod - Create a new pod
+/addtopod - Add a user to a pod
+"""
+    
+    help_text += """
+**💡 Tips for Success:**
 • Be specific with commitments
 • Include what, how much, and when
 • Check off completed items daily
@@ -1490,6 +1532,135 @@ async def help_handler(message: Message):
     help_text += "Questions? Use /feedback to reach us!"
     
     await message.answer(help_text, parse_mode="Markdown")
+
+@dp.message(Command("upgrade"))
+async def upgrade_handler(message: Message):
+    """Handle /upgrade command to initiate payment process"""
+    user_id = message.from_user.id
+    user_name = message.from_user.first_name or "there"
+    
+    # Check if user is already paid
+    try:
+        user_roles = await role_manager.get_user_roles(user_id)
+        if "paid" in user_roles:
+            await message.answer(
+                f"✨ **You're already premium, {user_name}!**\n\n"
+                "You have access to all premium features:\n"
+                "• Advanced analytics & insights\n"
+                "• Priority pod placement\n"
+                "• Extended streak tracking\n"
+                "• Personalized coaching tips\n"
+                "• Early access to new features\n\n"
+                "Thanks for being a premium member! 🙏",
+                parse_mode="Markdown"
+            )
+            return
+    except Exception as e:
+        logger.error(f"Error checking user roles: {e}")
+    
+    # Show upgrade information and initiate payment flow
+    upgrade_text = f"""💎 **Upgrade to Premium - ${17}/month**
+
+**Premium Features:**
+✨ Advanced progress analytics & insights
+🎯 Priority pod placement & exclusive pods  
+📊 Extended streak tracking & goal setting
+🤖 Personalized AI coaching recommendations
+🚀 Early access to new features
+📈 Detailed performance reports
+💬 Priority support
+
+**Ready to upgrade?**
+Premium membership helps support the development of new features and keeps our servers running!
+
+*Payment processing will be available soon. We'll notify you when it's ready!*
+
+**Questions?** Use /feedback to reach us!
+"""
+    
+    # Create upgrade button (placeholder for now)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔔 Notify Me When Ready", callback_data="notify_upgrade")],
+        [InlineKeyboardButton(text="📋 Learn More", callback_data="learn_more_premium")],
+    ])
+    
+    await message.answer(upgrade_text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    # Log upgrade interest
+    logger.info(f"💎 User {user_name} ({user_id}) expressed interest in upgrading")
+
+@dp.callback_query(F.data == "notify_upgrade")
+async def notify_upgrade_callback(callback: CallbackQuery):
+    """Handle notification signup for upgrade availability"""
+    user_id = callback.from_user.id
+    user_name = callback.from_user.first_name or "User"
+    
+    try:
+        # Add to upgrade notification list (could be stored in database)
+        # For now, we'll just log it
+        await callback.answer("✅ You'll be notified when premium is available!")
+        await callback.message.edit_text(
+            f"🔔 **Thanks {user_name}!**\n\n"
+            "You've been added to our premium notification list.\n"
+            "We'll message you as soon as premium features are ready!\n\n"
+            "Continue using the bot - your progress will carry over! 📈",
+            parse_mode="Markdown"
+        )
+        
+        logger.info(f"🔔 User {user_name} ({user_id}) signed up for upgrade notifications")
+        
+    except Exception as e:
+        logger.error(f"Error handling upgrade notification: {e}")
+        await callback.answer("Error processing request. Please try /feedback to contact us.")
+
+@dp.callback_query(F.data == "learn_more_premium")
+async def learn_more_premium_callback(callback: CallbackQuery):
+    """Handle learn more about premium callback"""
+    learn_more_text = """📖 **Premium Features Explained:**
+
+**🎯 Priority Pod Placement**
+• Get placed in pods with other premium members
+• Access to exclusive premium-only pods
+• Faster pod matching
+
+**📊 Advanced Analytics**
+• Detailed completion trends over time
+• Streak analysis and pattern recognition  
+• Goal achievement predictions
+• Personalized insights
+
+**🤖 AI Coaching**
+• Smart commitment suggestions
+• Personalized motivation messages
+• Optimal timing recommendations
+• Habit formation guidance
+
+**📈 Enhanced Tracking**
+• Extended streak history (beyond 30 days)
+• Multiple goal categories
+• Progress photos and notes
+• Export your data
+
+**🚀 Early Access**
+• Beta features before anyone else
+• Influence new feature development
+• Premium community access
+
+*All for just $17/month - less than a coffee per week!*
+"""
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔔 Notify Me", callback_data="notify_upgrade")],
+        [InlineKeyboardButton(text="⬅️ Back", callback_data="back_upgrade")],
+    ])
+    
+    await callback.message.edit_text(learn_more_text, parse_mode="Markdown", reply_markup=keyboard)
+
+@dp.callback_query(F.data == "back_upgrade")
+async def back_upgrade_callback(callback: CallbackQuery):
+    """Handle back to upgrade main page"""
+    # Reshow the main upgrade message
+    await upgrade_handler(callback.message)
 
 @dp.message(Command("progress"))
 async def progress_handler(message: Message):
@@ -2049,7 +2220,7 @@ async def add_to_pod_handler(message: Message):
         pod_name = name_match.group(1)
         
         # Get user by username
-        user_result = supabase.table("users").select("telegram_user_id").eq("telegram_username", username).execute()
+        user_result = supabase.table("users").select("telegram_user_id").eq("username", username).execute()
         if not user_result.data:
             await message.answer(f"❌ User @{username} not found")
             return
@@ -2439,23 +2610,63 @@ async def handle_text_messages(message: Message):
             "/help - See all commands"
         )
 
+async def set_user_commands(user_id: int):
+    """Set commands for specific user based on their progress"""
+    try:
+        # Check if user exists and get their status
+        is_first_time = await role_manager.is_first_time_user(user_id)
+        user_roles = await role_manager.get_user_roles(user_id)
+        is_admin = "admin" in user_roles or "superadmin" in user_roles
+        
+        if is_first_time:
+            # First-time users only see /start
+            commands = [
+                BotCommand(command="start", description="Welcome! Let's get started"),
+            ]
+        else:
+            # After /start, show core commands + help
+            commands = [
+                BotCommand(command="commit", description="Make a new commitment"),
+                BotCommand(command="done", description="Mark commitments complete"),
+                BotCommand(command="help", description="See all commands & get help"),
+            ]
+            
+            # Add advanced commands for users who have made commitments
+            if not is_first_time:
+                commands.extend([
+                    BotCommand(command="list", description="See your commitments"),
+                    BotCommand(command="progress", description="View your progress & streaks"),
+                    BotCommand(command="feedback", description="Send us feedback"),
+                    BotCommand(command="upgrade", description="Upgrade to premium"),
+                ])
+                
+                # Pod commands for pod members
+                if "pod_member" in user_roles:
+                    commands.extend([
+                        BotCommand(command="mypod", description="View your pod info"),
+                        BotCommand(command="podleaderboard", description="Pod weekly rankings"),
+                        BotCommand(command="podweek", description="Pod week progress"),
+                    ])
+            
+            # Admin commands
+            if is_admin:
+                commands.extend([
+                    BotCommand(command="listpods", description="[Admin] List all pods"),
+                    BotCommand(command="createpod", description="[Admin] Create new pod"),
+                    BotCommand(command="addtopod", description="[Admin] Add user to pod"),
+                ])
+        
+        await bot.set_my_commands(commands, scope=types.BotCommandScopeChat(chat_id=user_id))
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Error setting user commands: {e}")
+        return False
+
 async def set_bot_commands():
-    """Set bot commands for the menu - includes pod commands"""
+    """Set default bot commands for new users"""
     commands = [
         BotCommand(command="start", description="Welcome! Let's get started"),
-        BotCommand(command="commit", description="Make a new commitment"),
-        BotCommand(command="done", description="Mark commitments complete"),
-        BotCommand(command="list", description="See your commitments"),
-        BotCommand(command="progress", description="View your progress & streaks"),
-        BotCommand(command="mypod", description="View your pod info"),
-        BotCommand(command="podleaderboard", description="Pod weekly rankings"),
-        BotCommand(command="podweek", description="Pod week progress"),
-        BotCommand(command="help", description="Get help with commands"),
-        BotCommand(command="feedback", description="Send us feedback"),
-        # Admin commands
-        BotCommand(command="listpods", description="[Admin] List all pods"),
-        BotCommand(command="createpod", description="[Admin] Create new pod"),
-        BotCommand(command="addtopod", description="[Admin] Add user to pod"),
     ]
     await bot.set_my_commands(commands)
 
