@@ -17,7 +17,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from supabase import create_client, Client
 import openai
-from smart_3_retry_system import Smart3RetrySystem
+from smart_3_retry_system import Smart2RetrySystem
 
 # Load environment variables securely
 try:
@@ -420,8 +420,8 @@ class DatabaseManager:
 # Initialize analysis engine with secure config
 smart_analyzer = SmartAnalysis(config)
 
-# Initialize SMART 3-retry system now that dependencies are ready
-smart_3_retry = Smart3RetrySystem(smart_analyzer, bot)
+# Initialize SMART 2-retry system now that dependencies are ready
+smart_3_retry = Smart2RetrySystem(smart_analyzer, bot)
 
 # Initialize role manager
 from user_role_manager import UserRoleManager
@@ -1292,8 +1292,20 @@ async def retry_callback_handler(callback: CallbackQuery):
             retry_input_state[user_id] = retry_key
             
         elif result and result.get('success'):
-            # Commitment was saved, trigger sequences
-            await _trigger_commitment_sequences(callback.from_user.id)
+            # Save the commitment to database
+            success = await DatabaseManager.save_commitment(
+                telegram_user_id=callback.from_user.id,
+                commitment=result['commitment'],
+                original_commitment=result['original_commitment'],
+                smart_score=result['score']
+            )
+            
+            if success:
+                # Commitment was saved, trigger sequences
+                await _trigger_commitment_sequences(callback.from_user.id)
+                logger.info(f"✅ Retry callback commitment saved successfully")
+            else:
+                logger.error(f"❌ Failed to save commitment from retry callback")
             
     except Exception as e:
         logger.error(f"❌ Error in retry callback handler: {e}")
@@ -2027,21 +2039,12 @@ async def handle_text_messages(message: Message):
         )
 
 async def set_bot_commands():
-    """Set bot commands for the menu"""
+    """Set bot commands for the menu - Week 1 core commands only"""
     commands = [
-        BotCommand(command="start", description="Welcome message"),
-        BotCommand(command="commit", description="Add a new commitment"),
-        BotCommand(command="remind", description="Set commitment with reminder"),
-        BotCommand(command="done", description="Mark commitments as complete"),
-        BotCommand(command="list", description="View your active commitments"),
-        BotCommand(command="track", description="See detailed progress tracking"),
-        BotCommand(command="checkin", description="Accountability check-in"),
-        BotCommand(command="streakboost", description="Get streak-building tips"),
-        BotCommand(command="progress", description="See your meaningful progress"),
-        BotCommand(command="stats", description="View points & achievements"),
-        BotCommand(command="leaderboard", description="See this week's top performers"),
-        BotCommand(command="feedback", description="Send feedback or suggestions"),
-        BotCommand(command="help", description="Show help message"),
+        BotCommand(command="start", description="Welcome! Let's get started"),
+        BotCommand(command="commit", description="Make a new commitment"),
+        BotCommand(command="list", description="See your commitments"),
+        BotCommand(command="done", description="Mark commitments complete"),
     ]
     await bot.set_my_commands(commands)
 
