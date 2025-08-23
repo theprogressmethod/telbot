@@ -426,6 +426,7 @@ smart_3_retry = Smart2RetrySystem(smart_analyzer, bot)
 # Initialize role manager
 from user_role_manager import UserRoleManager
 from user_analytics import UserAnalytics
+from basic_pod_system import BasicPodSystem
 try:
     from dream_focused_analytics import DreamFocusedAnalytics
     dream_analytics = DreamFocusedAnalytics(supabase)
@@ -461,6 +462,7 @@ except ImportError:
 role_manager = UserRoleManager(supabase)
 user_analytics = UserAnalytics(supabase)
 pod_tracker = PodWeekTracker(supabase)
+pod_system = BasicPodSystem(supabase)
 
 # Temporary storage for callback data (use Redis in production)
 temp_storage = {}
@@ -571,18 +573,98 @@ class CommitmentTracker:
             # Get streak information
             streak = await self.calculate_commitment_streak(telegram_user_id)
             
+            # Get this week's stats
+            week_stats = await self.get_week_stats(telegram_user_id)
+            
+            # Get longest streak
+            longest_streak = await self.get_longest_streak(telegram_user_id)
+            
             return {
                 "total_commitments": total_commitments,
                 "completed_commitments": completed_commitments,
                 "active_commitments": active_commitments,
                 "completion_rate": round(completion_rate, 1),
                 "current_streak": streak,
+                "longest_streak": longest_streak,
+                "week_completed": week_stats['completed'],
+                "week_total": week_stats['total'],
+                "week_rate": week_stats['rate'],
                 "progress_level": self._get_progress_level(completion_rate, total_commitments)
             }
             
         except Exception as e:
             logger.error(f"❌ Error getting commitment progress: {e}")
             return {}
+    
+    async def get_week_stats(self, telegram_user_id: int) -> Dict[str, Any]:
+        """Get this week's commitment statistics"""
+        try:
+            from datetime import timedelta
+            
+            # Get start of current week (Monday)
+            today = datetime.now().date()
+            days_since_monday = today.weekday()
+            week_start = today - timedelta(days=days_since_monday)
+            week_start_str = week_start.isoformat()
+            
+            # Get all commitments created this week
+            week_result = self.supabase.table("commitments").select("*").eq(
+                "telegram_user_id", telegram_user_id
+            ).gte("created_at", week_start_str).execute()
+            
+            week_total = len(week_result.data) if week_result.data else 0
+            week_completed = sum(1 for c in week_result.data if c.get("status") == "completed") if week_result.data else 0
+            week_rate = round((week_completed / week_total * 100) if week_total > 0 else 0, 1)
+            
+            return {
+                "total": week_total,
+                "completed": week_completed,
+                "rate": week_rate
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting week stats: {e}")
+            return {"total": 0, "completed": 0, "rate": 0}
+    
+    async def get_longest_streak(self, telegram_user_id: int) -> int:
+        """Calculate longest commitment streak ever achieved"""
+        try:
+            # Get all completed commitments
+            result = self.supabase.table("commitments").select("completed_at").eq(
+                "telegram_user_id", telegram_user_id
+            ).eq("status", "completed").order("completed_at", desc=False).execute()
+            
+            if not result.data:
+                return 0
+            
+            # Convert to dates and sort
+            dates = []
+            for commitment in result.data:
+                if commitment.get("completed_at"):
+                    date = datetime.fromisoformat(commitment["completed_at"].replace('Z', '+00:00')).date()
+                    dates.append(date)
+            
+            if not dates:
+                return 0
+                
+            dates = sorted(list(set(dates)))  # Remove duplicates and sort
+            
+            # Find longest consecutive sequence
+            longest = 1
+            current = 1
+            
+            for i in range(1, len(dates)):
+                if (dates[i] - dates[i-1]).days == 1:
+                    current += 1
+                    longest = max(longest, current)
+                else:
+                    current = 1
+                    
+            return longest
+            
+        except Exception as e:
+            logger.error(f"❌ Error calculating longest streak: {e}")
+            return 0
     
     async def calculate_commitment_streak(self, telegram_user_id: int) -> int:
         """Calculate current commitment completion streak"""
@@ -1359,44 +1441,61 @@ async def feedback_handler(message: Message):
 async def help_handler(message: Message):
     """Handle /help command with role-based features"""
     user_id = message.from_user.id
-    roles = await role_manager.get_user_roles(user_id)
-    permissions = await role_manager.get_user_permissions(user_id)
     
-    help_text = """📚 *How to use this bot:*
+    # Check if user has admin role
+    is_admin = False
+    try:
+        roles_result = supabase.table("user_roles").select("role_type").eq(
+            "user_id", supabase.table("users").select("id").eq("telegram_user_id", user_id).execute().data[0]["id"]
+        ).eq("is_active", True).execute()
+        is_admin = any(r["role_type"] in ["admin", "super_admin"] for r in roles_result.data)
+    except:
+        pass
+    
+    help_text = """📚 **How to use this bot:**
 
-*Basic Commands:*
-/commit <your commitment> - Add a commitment
+**Core Commands:**
+/start - Welcome & getting started
+/commit <text> - Add a commitment
 /done - Mark commitments complete  
 /list - View your active commitments
+/progress - View streaks & stats
 /feedback <message> - Send feedback
-/sequences - View guidance messages
-/stop_sequences - Turn off automated messages
+/help - This help message
 
-*Tips:*
-- Be specific with your commitments
-- Start small and build consistency
-- Check off completed items daily
+**Pod Commands:**
+/mypod - View your pod info
+/podleaderboard - Weekly pod rankings
+/podweek - Current pod week progress
+
+**Tips:**
+• Be specific with commitments
+• Include what, how much, and when
+• Check off completed items daily
+• Join a pod for accountability!
 
 """
     
-    # Add role-specific features
-    if permissions.get("can_join_pods"):
-        help_text += "*Pod Member Features:*\n/pods - View your pod info\n/podweek - Current pod week progress\n/podleaderboard - Pod week leaderboard\n/attendance - Your meeting attendance\n/podattendance - Pod attendance stats\n"
-        
-    if permissions.get("can_access_long_term_goals"):
-        help_text += "*Paid Features:*\n/goals - Manage long-term goals\n/insights - Get AI insights\n"
+    # Add admin commands if user is admin
+    if is_admin:
+        help_text += """**Admin Commands:**
+/listpods - View all active pods
+/createpod "Name" Day Time - Create new pod
+/addtopod @user "Pod Name" - Add user to pod
+/grant_role - Grant roles to users
+/adminstats - View platform statistics
+
+"""
     
-    if permissions.get("can_view_analytics"):
-        help_text += "*Admin Commands:*\n/stats - View platform statistics\n/grant_role - Grant role to user\n/users - Manage users\n/markattendance - Record meeting attendance\n"
-    
-    help_text += "\nQuestions? Use /feedback to reach us!"
+    help_text += "Questions? Use /feedback to reach us!"
     
     await message.answer(help_text, parse_mode="Markdown")
 
 @dp.message(Command("progress"))
 async def progress_handler(message: Message):
-    """Show meaningful progress toward dreams (not just points)"""
+    """Show meaningful progress with streaks and completion rates"""
     user_id = message.from_user.id
+    user_name = message.from_user.first_name or "there"
     
     # Ensure user exists
     await role_manager.ensure_user_exists(
@@ -1405,22 +1504,80 @@ async def progress_handler(message: Message):
         message.from_user.username
     )
     
-    # Get and format dream-focused analytics
-    if dream_analytics:
-        progress_message = await dream_analytics.format_meaningful_message(user_id)
+    # Get progress data
+    progress = await commitment_tracker.get_commitment_progress(user_id)
+    
+    if not progress or progress.get('total_commitments', 0) == 0:
+        progress_message = (
+            f"🌱 **Welcome to Your Progress Journey, {user_name}!**\n\n"
+            f"You haven't made any commitments yet.\n\n"
+            f"Every journey starts with a single step!\n"
+            f"Use /commit to add your first goal and start building momentum.\n\n"
+            f"💡 **Pro tip:** Start small and be specific!"
+        )
     else:
-        # Fallback progress message using commitment tracker
-        progress = await commitment_tracker.get_commitment_progress(user_id)
-        if progress:
-            progress_message = f"📊 **Your Progress**\n\n" \
-                             f"• Total Commitments: {progress['total_commitments']}\n" \
-                             f"• Completed: {progress['completed_commitments']}\n" \
-                             f"• Success Rate: {progress['completion_rate']}%\n" \
-                             f"• Current Streak: {progress['current_streak']} days\n\n" \
-                             f"**Level**: {progress['progress_level']}\n\n" \
-                             f"Keep building those habits! 🚀"
+        # Build visual progress bar
+        completion_rate = progress['completion_rate']
+        bar_length = 10
+        filled = int(completion_rate / 10)
+        bar = "█" * filled + "░" * (bar_length - filled)
+        
+        # Streak display with emoji
+        current_streak = progress['current_streak']
+        longest_streak = progress.get('longest_streak', current_streak)
+        streak_emoji = "🔥" if current_streak >= 7 else "⭐" if current_streak >= 3 else "🌟"
+        
+        # Week progress
+        week_completed = progress.get('week_completed', 0)
+        week_total = progress.get('week_total', 0)
+        week_rate = progress.get('week_rate', 0)
+        
+        # Build the progress message
+        progress_message = f"📊 **{user_name}'s Progress Dashboard**\n"
+        progress_message += f"{'═' * 30}\n\n"
+        
+        # Streaks section
+        progress_message += f"{streak_emoji} **STREAKS**\n"
+        progress_message += f"Current: **{current_streak} days**"
+        if current_streak > 0:
+            progress_message += " - Keep it going!"
+        progress_message += f"\nLongest: **{longest_streak} days**\n\n"
+        
+        # This week section
+        progress_message += f"📅 **THIS WEEK**\n"
+        if week_total > 0:
+            progress_message += f"Completed: **{week_completed}/{week_total}** ({week_rate}%)\n"
         else:
-            progress_message = "🌱 Ready to start your progress journey?\n\nUse /commit to add your first goal!"
+            progress_message += f"No commitments yet this week\n"
+        progress_message += f"Active now: **{progress['active_commitments']}** commitments\n\n"
+        
+        # Overall stats
+        progress_message += f"📈 **OVERALL STATS**\n"
+        progress_message += f"Total made: **{progress['total_commitments']}** commitments\n"
+        progress_message += f"Completed: **{progress['completed_commitments']}** ({completion_rate}%)\n"
+        progress_message += f"Progress: [{bar}] {completion_rate}%\n\n"
+        
+        # Progress level
+        progress_message += f"🏆 **LEVEL**: {progress['progress_level']}\n\n"
+        
+        # Motivational message based on performance
+        if completion_rate >= 80:
+            progress_message += "💪 **Outstanding consistency!** You're crushing it!"
+        elif completion_rate >= 60:
+            progress_message += "🎯 **Great progress!** You're building strong habits!"
+        elif completion_rate >= 40:
+            progress_message += "📈 **Good momentum!** Keep pushing forward!"
+        elif current_streak >= 3:
+            progress_message += f"🔥 **{current_streak} day streak!** You're on fire!"
+        else:
+            progress_message += "🌱 **Every step counts!** Keep going!"
+        
+        # Call to action
+        progress_message += "\n\n"
+        if progress['active_commitments'] == 0:
+            progress_message += "📝 Use /commit to add a new goal!"
+        elif progress['active_commitments'] > 0:
+            progress_message += "✅ Use /done to mark commitments complete!"
     
     await message.answer(progress_message, parse_mode="Markdown")
 
@@ -1459,20 +1616,65 @@ async def streaks_handler(message: Message):
     streak_message = await leaderboard.format_streak_leaderboard_message()
     await message.answer(streak_message, parse_mode="Markdown")
 
+@dp.message(Command("mypod"))
+async def my_pod_handler(message: Message):
+    """Show user's pod information"""
+    user_id = message.from_user.id
+    
+    # Get user's pod
+    pod_info = await pod_system.get_user_pod(user_id)
+    
+    if not pod_info:
+        await message.answer(
+            "🎯 **You're not in a pod yet!**\n\n"
+            "Pods are groups of 4-6 people who meet weekly for accountability.\n\n"
+            "Being in a pod helps you:\n"
+            "• Stay consistent with your commitments\n"
+            "• Get support from peers\n"
+            "• Celebrate wins together\n\n"
+            "Ask an admin to add you to a pod!"
+        )
+        return
+    
+    # Format pod information
+    days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    meeting_day = days[pod_info["meeting_day"]]
+    
+    pod_message = f"🎯 **Your Pod: {pod_info['pod_name']}**\n"
+    pod_message += f"{'═' * 30}\n\n"
+    
+    pod_message += f"📅 **Weekly Meeting**\n"
+    pod_message += f"Every {meeting_day} at {pod_info['meeting_time']}\n"
+    if pod_info["meeting_link"]:
+        pod_message += f"[Join Meeting]({pod_info['meeting_link']})\n"
+    pod_message += f"\n"
+    
+    pod_message += f"👥 **Members ({pod_info['total_members']}/{pod_info['max_members']})**\n"
+    for i, member in enumerate(pod_info["members"], 1):
+        emoji = "👑" if member["role"] == "leader" else "🎯"
+        pod_message += f"{i}. {emoji} **{member['name']}**\n"
+        if member["week_commitments"] > 0:
+            pod_message += f"   This week: {member['week_completion_rate']}% ({member['week_commitments']} commitments)\n"
+        else:
+            pod_message += f"   No commitments yet this week\n"
+    
+    pod_message += f"\n📊 Use /podleaderboard to see this week's rankings!"
+    
+    await message.answer(pod_message, parse_mode="Markdown")
+
 @dp.message(Command("podweek"))
 async def pod_week_handler(message: Message):
     """Show current pod week progress"""
     user_id = message.from_user.id
     
-    # Check if user is pod member
-    if not await role_manager.user_has_role(user_id, "pod_member"):
-        await message.answer("🎯 This feature is for pod members! Join a pod at theprogressmethod.com")
+    # Get user's pod
+    pod_info = await pod_system.get_user_pod(user_id)
+    
+    if not pod_info:
+        await message.answer("🎯 You're not in a pod yet! Ask an admin to add you.")
         return
     
-    # For now, we'll simulate pod_id - in production this would come from user's pod membership
-    # TODO: Get actual pod_id from user's pod membership
-    pod_id = "demo-pod-id"  # Placeholder
-    
+    pod_id = pod_info["pod_id"]
     summary = await pod_tracker.format_pod_week_summary(str(user_id), pod_id)
     await message.answer(summary, parse_mode="Markdown")
 
@@ -1481,26 +1683,35 @@ async def pod_leaderboard_handler(message: Message):
     """Show pod week leaderboard"""
     user_id = message.from_user.id
     
-    if not await role_manager.user_has_role(user_id, "pod_member"):
-        await message.answer("🎯 This feature is for pod members!")
+    # Get user's pod
+    pod_info = await pod_system.get_user_pod(user_id)
+    
+    if not pod_info:
+        await message.answer("🎯 You're not in a pod yet! Ask an admin to add you.")
         return
     
-    # TODO: Get actual pod_id from user's pod membership
-    pod_id = "demo-pod-id"  # Placeholder
-    
-    leaderboard_data = await pod_tracker.get_pod_week_leaderboard(pod_id)
+    pod_id = pod_info["pod_id"]
+    leaderboard_data = await pod_system.get_pod_leaderboard(pod_id)
     
     if not leaderboard_data:
         await message.answer("📊 No pod activity this week yet! Be the first to make a commitment.")
         return
     
-    message_text = "🏆 **This Week's Pod Leaderboard**\n\n"
+    message_text = f"🏆 **{pod_info['pod_name']} - This Week's Leaderboard**\n"
+    message_text += f"{'═' * 30}\n\n"
     
-    for user_data in leaderboard_data:
-        message_text += f"{user_data['emoji']} **{user_data['rank']}. {user_data['user_name']}**\n"
-        message_text += f"   ✅ {user_data['completed_commitments']}/{user_data['total_commitments']} ({user_data['completion_rate']}%)\n"
-        message_text += f"   ⭐ Avg Quality: {user_data['avg_quality']}/10\n\n"
+    for member in leaderboard_data:
+        message_text += f"{member['emoji']} **{member['rank']}. {member['name']}**\n"
+        if member['week_total'] > 0:
+            message_text += f"   ✅ Completed: {member['week_completed']}/{member['week_total']} ({member['completion_rate']}%)\n"
+            message_text += f"   ⭐ Points: {member['points']}\n"
+        else:
+            message_text += f"   No commitments yet\n"
+        message_text += "\n"
     
+    # Add motivational message
+    if leaderboard_data[0]['points'] > 0:
+        message_text += f"🔥 Leading: **{leaderboard_data[0]['name']}** with {leaderboard_data[0]['points']} points!\n"
     message_text += "Keep up the great work, team! 💪"
     
     await message.answer(message_text, parse_mode="Markdown")
@@ -1722,6 +1933,196 @@ async def admin_stats_handler(message: Message):
     except Exception as e:
         logger.error(f"Error in stats command: {e}")
         await message.answer("❌ Error retrieving statistics.")
+
+@dp.message(Command("createpod"))
+async def create_pod_handler(message: Message):
+    """Admin command to create a new pod"""
+    user_id = message.from_user.id
+    
+    if not await role_manager.user_has_any_role(user_id, ["admin", "super_admin"]):
+        await message.answer("⛔ Admin access required.")
+        return
+    
+    # Parse command: /createpod "Pod Name" Monday 19:00 https://meet.google.com/xyz
+    parts = message.text.split(maxsplit=4)
+    if len(parts) < 4:
+        await message.answer(
+            "📝 **Create Pod Usage:**\n"
+            "`/createpod \"Pod Name\" Day Time [MeetLink]`\n\n"
+            "Examples:\n"
+            "• `/createpod \"Alpha Squad\" Monday 19:00`\n"
+            "• `/createpod \"Beta Team\" Wednesday 20:30 https://meet.google.com/abc-defg-hij`\n\n"
+            "Days: Monday-Sunday\n"
+            "Time: 24hr format (HH:MM)",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        # Extract pod name (handle quotes)
+        import re
+        name_match = re.search(r'"([^"]+)"', message.text)
+        if not name_match:
+            await message.answer("❌ Pod name must be in quotes")
+            return
+            
+        pod_name = name_match.group(1)
+        remaining = message.text[name_match.end():].strip().split()
+        
+        if len(remaining) < 2:
+            await message.answer("❌ Please provide day and time")
+            return
+            
+        day_str = remaining[0]
+        time_str = remaining[1]
+        meeting_link = remaining[2] if len(remaining) > 2 else None
+        
+        # Convert day to number
+        days = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, 
+                "friday": 4, "saturday": 5, "sunday": 6}
+        day_num = days.get(day_str.lower())
+        
+        if day_num is None:
+            await message.answer("❌ Invalid day. Use Monday-Sunday")
+            return
+        
+        # Validate time format
+        if not re.match(r"^\d{1,2}:\d{2}$", time_str):
+            await message.answer("❌ Invalid time format. Use HH:MM (24hr)")
+            return
+            
+        # Create pod
+        result = await pod_system.create_pod(
+            pod_name=pod_name,
+            meeting_time=f"{time_str}:00",
+            meeting_day=day_num,
+            created_by_id=user_id,
+            meeting_link=meeting_link
+        )
+        
+        if result["success"]:
+            await message.answer(
+                f"✅ **Pod Created Successfully!**\n\n"
+                f"🎯 Name: {pod_name}\n"
+                f"📅 Meeting: {day_str} at {time_str}\n"
+                f"👥 Capacity: 0/6 members\n\n"
+                f"Use `/addtopod @username \"{pod_name}\"` to add members"
+            )
+        else:
+            await message.answer(f"❌ Failed to create pod: {result.get('error', 'Unknown error')}")
+            
+    except Exception as e:
+        logger.error(f"Error in create pod: {e}")
+        await message.answer("❌ Error creating pod. Check command format.")
+
+@dp.message(Command("addtopod"))
+async def add_to_pod_handler(message: Message):
+    """Admin command to add user to a pod"""
+    user_id = message.from_user.id
+    
+    if not await role_manager.user_has_any_role(user_id, ["admin", "super_admin"]):
+        await message.answer("⛔ Admin access required.")
+        return
+    
+    # Parse command: /addtopod @username "Pod Name"
+    parts = message.text.split(maxsplit=2)
+    if len(parts) < 3:
+        await message.answer(
+            "📝 **Add to Pod Usage:**\n"
+            "`/addtopod @username \"Pod Name\"`\n\n"
+            "Example:\n"
+            "`/addtopod @john \"Alpha Squad\"`",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        username = parts[1].replace("@", "")
+        
+        # Extract pod name
+        import re
+        name_match = re.search(r'"([^"]+)"', message.text)
+        if not name_match:
+            await message.answer("❌ Pod name must be in quotes")
+            return
+            
+        pod_name = name_match.group(1)
+        
+        # Get user by username
+        user_result = supabase.table("users").select("telegram_user_id").eq("telegram_username", username).execute()
+        if not user_result.data:
+            await message.answer(f"❌ User @{username} not found")
+            return
+            
+        target_user_id = user_result.data[0]["telegram_user_id"]
+        
+        # Get pod by name
+        pod_result = supabase.table("pods").select("id").eq("name", pod_name).eq("status", "active").execute()
+        if not pod_result.data:
+            await message.answer(f"❌ Pod '{pod_name}' not found")
+            return
+            
+        pod_id = pod_result.data[0]["id"]
+        
+        # Add user to pod
+        result = await pod_system.assign_user_to_pod(target_user_id, pod_id, user_id)
+        
+        if result["success"]:
+            await message.answer(
+                f"✅ **Added @{username} to {pod_name}!**\n\n"
+                f"They can now use:\n"
+                f"• `/mypod` - View pod info\n"
+                f"• `/podleaderboard` - See rankings\n"
+                f"• `/podweek` - Check progress"
+            )
+            
+            # Notify the user
+            try:
+                await bot.send_message(
+                    target_user_id,
+                    f"🎉 **Welcome to {pod_name}!**\n\n"
+                    f"You've been added to a pod!\n"
+                    f"Use `/mypod` to see your pod details and meet your teammates.\n\n"
+                    f"Pods help you stay accountable and achieve your goals! 🚀"
+                )
+            except:
+                pass  # User might have blocked bot
+                
+        else:
+            await message.answer(f"❌ Failed: {result.get('error', 'Unknown error')}")
+            
+    except Exception as e:
+        logger.error(f"Error adding to pod: {e}")
+        await message.answer("❌ Error adding user to pod")
+
+@dp.message(Command("listpods"))
+async def list_pods_handler(message: Message):
+    """Admin command to list all pods"""
+    user_id = message.from_user.id
+    
+    if not await role_manager.user_has_any_role(user_id, ["admin", "super_admin"]):
+        await message.answer("⛔ Admin access required.")
+        return
+    
+    pods = await pod_system.list_all_pods()
+    
+    if not pods:
+        await message.answer("📭 No active pods yet. Use `/createpod` to create one.")
+        return
+    
+    message_text = "🎯 **Active Pods**\n"
+    message_text += f"{'═' * 30}\n\n"
+    
+    for pod in pods:
+        status_emoji = "🔴" if pod["status"] == "Full" else "🟢"
+        message_text += f"{status_emoji} **{pod['name']}**\n"
+        message_text += f"   Members: {pod['members']}\n"
+        message_text += f"   Meeting: {pod['meeting']}\n"
+        message_text += f"   Status: {pod['status']}\n\n"
+    
+    message_text += f"Total: {len(pods)} pods"
+    
+    await message.answer(message_text, parse_mode="Markdown")
 
 @dp.message(Command("grant_role"))
 async def grant_role_handler(message: Message):
@@ -2039,12 +2440,22 @@ async def handle_text_messages(message: Message):
         )
 
 async def set_bot_commands():
-    """Set bot commands for the menu - Week 1 core commands only"""
+    """Set bot commands for the menu - includes pod commands"""
     commands = [
         BotCommand(command="start", description="Welcome! Let's get started"),
         BotCommand(command="commit", description="Make a new commitment"),
-        BotCommand(command="list", description="See your commitments"),
         BotCommand(command="done", description="Mark commitments complete"),
+        BotCommand(command="list", description="See your commitments"),
+        BotCommand(command="progress", description="View your progress & streaks"),
+        BotCommand(command="mypod", description="View your pod info"),
+        BotCommand(command="podleaderboard", description="Pod weekly rankings"),
+        BotCommand(command="podweek", description="Pod week progress"),
+        BotCommand(command="help", description="Get help with commands"),
+        BotCommand(command="feedback", description="Send us feedback"),
+        # Admin commands
+        BotCommand(command="listpods", description="[Admin] List all pods"),
+        BotCommand(command="createpod", description="[Admin] Create new pod"),
+        BotCommand(command="addtopod", description="[Admin] Add user to pod"),
     ]
     await bot.set_my_commands(commands)
 

@@ -50,27 +50,53 @@ class Smart2RetrySystem:
         # Start with initial analysis
         return await self._attempt_smart_analysis(retry_key, message_to_edit)
     
-    def _get_smart_refining_question(self, analysis: Dict) -> str:
-        """Get specific refining question based on lowest SMART dimension"""
+    def _get_smart_feedback_and_question(self, analysis: Dict) -> tuple[str, str]:
+        """Get specific SMART feedback and refining question based on what needs improvement"""
         
         # Extract SMART scores if available
         feedback = analysis.get('feedback', '').lower()
-        smart_version = analysis.get('smartVersion', '')
         
-        # Determine which SMART dimension needs the most work
+        # Identify specific SMART dimensions that need work
+        missing_dimensions = []
+        question = ""
+        
         if 'specific' in feedback or 'vague' in feedback:
-            return "🎯 Let's get specific! What EXACTLY will you do? Instead of 'exercise,' try 'do 20 push-ups' or 'walk for 15 minutes.'"
-        elif 'measurable' in feedback or 'measure' in feedback:
-            return "📏 How will you measure success? Add numbers like 'for 30 minutes,' '10 pages,' or 'complete 3 tasks.'"
-        elif 'time' in feedback or 'when' in feedback or 'deadline' in feedback:
-            return "⏰ When will you do this? Add a specific time like 'by 8pm today' or 'at 7am tomorrow morning.'"
-        elif 'achievable' in feedback or 'realistic' in feedback:
-            return "🎪 Is this realistic for you right now? Maybe start smaller and build momentum!"
-        elif 'relevant' in feedback:
-            return "🔥 Why is this important to you? What bigger goal does this connect to?"
+            missing_dimensions.append('specific')
+            question = "🎯 What exactly will you do? Instead of 'exercise,' try 'do 20 push-ups' or 'walk for 15 minutes.'"
+        
+        if 'measurable' in feedback or 'measure' in feedback:
+            missing_dimensions.append('measurable')
+            if not question:
+                question = "📏 How will you measure success? Add numbers like 'for 30 minutes,' '10 pages,' or 'complete 3 tasks.'"
+        
+        if 'time' in feedback or 'when' in feedback or 'deadline' in feedback:
+            missing_dimensions.append('time-bound')
+            if not question:
+                question = "⏰ When will you do this? Add a specific time like 'by 8pm today' or 'at 7am tomorrow morning.'"
+        
+        if 'achievable' in feedback or 'realistic' in feedback:
+            missing_dimensions.append('achievable')
+            if not question:
+                question = "💪 Is this realistic for you right now? Maybe start smaller and build momentum!"
+        
+        if 'relevant' in feedback:
+            missing_dimensions.append('relevant')
+            if not question:
+                question = "🎯 Why is this important to you? What bigger goal does this connect to?"
+        
+        # Create specific feedback about what dimensions need work
+        if len(missing_dimensions) == 1:
+            smart_feedback = f"Let's make this more {missing_dimensions[0]}!"
+        elif len(missing_dimensions) == 2:
+            smart_feedback = f"Let's make this more {missing_dimensions[0]} and {missing_dimensions[1]}!"
+        elif len(missing_dimensions) > 2:
+            smart_feedback = f"Let's make this more {', '.join(missing_dimensions[:-1])}, and {missing_dimensions[-1]}!"
         else:
-            # Generic question if we can't identify the specific weakness
-            return "✨ Let's make this crystal clear! What exactly will you do, for how long, and by when?"
+            # Generic fallback
+            smart_feedback = "Let's make this clearer and more actionable!"
+            question = "✨ What exactly will you do, for how long, and by when?"
+        
+        return smart_feedback, question
     
     async def _attempt_smart_analysis(self, retry_key: str, message_to_edit) -> Dict[str, Any]:
         """Perform SMART analysis attempt with retry tracking"""
@@ -131,10 +157,10 @@ class Smart2RetrySystem:
         ]
         
         if retry_count == 0:
-            success_msg = f"🔥 WOW! Fantastic commitment right out of the gate! (Score: {analysis['score']}/10) \n\nYou're a natural at this!"
+            success_msg = f"🌟 Excellent! That's a solid commitment right from the start! (Score: {analysis['score']}/10)\n\nYou've got this!"
         else:
             success_msg = success_messages[min(retry_count - 1, len(success_messages) - 1)]
-            success_msg += f"\n\n💪 I LOVE seeing you refine and improve! That's the growth mindset in action!"
+            success_msg += f"\n\n💪 I really appreciate how you took the time to refine this. That's the growth mindset in action!"
         
         success_msg += f"\n\n📝 \"{retry_data['current_commitment']}\"\n\n"
         success_msg += "Added to your commitments! Use /done when you complete it."
@@ -159,32 +185,32 @@ class Smart2RetrySystem:
         retry_count = retry_data['retry_count']
         score = analysis['score']
         
-        # Get specific refining question based on SMART weakness
-        smart_question = self._get_smart_refining_question(analysis)
+        # Get specific SMART feedback and refining question
+        smart_feedback, smart_question = self._get_smart_feedback_and_question(analysis)
         
-        # Enthusiastic coaching guidance based on retry count
+        # Grounded, caring coaching guidance based on retry count
         if retry_count == 0:
-            # First retry - enthusiastic and specific
-            guidance_title = "🌟 Hey, I can see the potential here! Let's level this up!"
+            # First retry - encouraging and specific
+            guidance_title = f"🌟 Good foundation! {smart_feedback}"
             guidance_text = (
                 f"You scored {score}/10 - that's a solid start! 💪\n\n"
                 f"{smart_question}\n\n"
                 f"💡 **Here's what I'm thinking:** \"{analysis['smartVersion']}\"\n\n"
-                f"Ready to make this even better? I believe in you! 🚀"
+                f"Want to give it another try? I'm here to help! 🤝"
             )
             
         else:  # retry_count == 1 (final retry)
-            # Second retry - maximum enthusiasm and help
-            guidance_title = "🔥 You're SO close! One more push and you'll have this!"
+            # Second retry - supportive and clear
+            guidance_title = f"🎯 You're getting there! {smart_feedback}"
             guidance_text = (
-                f"Score: {score}/10 - I can feel the momentum building! 🎯\n\n"
+                f"Score: {score}/10 - I can see you're putting in the effort! 💪\n\n"
                 f"{smart_question}\n\n"
-                f"🎪 **My best suggestion:** \"{analysis['smartVersion']}\"\n\n"
-                f"✨ **Remember the SMART magic formula:**\n"
+                f"🌟 **My best suggestion:** \"{analysis['smartVersion']}\"\n\n"
+                f"✨ **Quick reminder:**\n"
                 f"• WHAT exactly will you do?\n"
                 f"• HOW MUCH or for how long?\n"
                 f"• BY WHEN will you finish?\n\n"
-                f"Let's make this commitment SHINE! You've got this! 🌟"
+                f"You're doing great - one more try! 🚀"
             )
         
         # Create retry keyboard
@@ -317,19 +343,23 @@ class Smart2RetrySystem:
     async def handle_retry_callback(self, callback_query, callback_data: str):
         """Handle callback from retry buttons"""
         
+        logger.info(f"🔄 Raw callback data: '{callback_data}'")
         parts = callback_data.split('_')
-        action = parts[1]  # improve, use_ai, keep, cancel, save_final
+        logger.info(f"🔄 Split parts: {parts}")
         
         # Handle compound actions like "use_ai" and "save_final"
-        if len(parts) >= 3 and parts[2] in ['ai', 'final']:
+        if len(parts) >= 3 and f"{parts[1]}_{parts[2]}" in ['use_ai', 'save_final']:
             action = f"{parts[1]}_{parts[2]}"
             retry_key = '_'.join(parts[3:])
         else:
+            action = parts[1]  # improve, keep, cancel
             retry_key = '_'.join(parts[2:])
         
-        logger.info(f"🔄 Processing retry callback: action='{action}', key='{retry_key}'")
+        logger.info(f"🔄 Parsed: action='{action}', key='{retry_key}'")
         
         if retry_key not in self.retry_storage:
+            logger.error(f"❌ Session key '{retry_key}' not found in storage")
+            logger.error(f"❌ Available keys: {list(self.retry_storage.keys())}")
             await callback_query.answer("Session expired. Please try /commit again.", show_alert=True)
             return None
         
@@ -337,12 +367,12 @@ class Smart2RetrySystem:
         
         if action == "improve":
             # User wants to manually improve - wait for their input
-            smart_question = self._get_smart_refining_question(retry_data['attempts'][-1]['analysis'])
+            smart_feedback, smart_question = self._get_smart_feedback_and_question(retry_data['attempts'][-1]['analysis'])
             await callback_query.message.edit_text(
-                f"🎯 YES! I love this energy! Let's craft something amazing!\n\n"
+                f"🌟 Great! {smart_feedback}\n\n"
                 f"**Your current commitment:** \"{retry_data['current_commitment']}\"\n\n"
                 f"{smart_question}\n\n"
-                f"Type your improved commitment below - I'm excited to see what you come up with! 🚀"
+                f"Type your improved commitment below - I'm here to help! 🤝"
             )
             
             # Mark as waiting for input
@@ -375,9 +405,9 @@ class Smart2RetrySystem:
             }
             
             await callback_query.message.edit_text(
-                f"🎉 AWESOME! Your commitment is locked and loaded!\n\n"
+                f"🌟 Perfect! Your commitment is saved!\n\n"
                 f"📝 \"{retry_data['original_commitment']}\"\n\n"
-                f"Now let's make it happen! Use /done when you crush this goal! 💪"
+                f"Now let's make it happen! Use /done when you complete it! 💪"
             )
             
             del self.retry_storage[retry_key]
@@ -397,9 +427,9 @@ class Smart2RetrySystem:
             }
             
             await callback_query.message.edit_text(
-                f"🚀 BOOM! That's what I call follow-through!\n\n"
+                f"🌟 Excellent! Your commitment is saved!\n\n"
                 f"📝 \"{retry_data['current_commitment']}\"\n\n"
-                f"You've got this locked in - now let's see you CRUSH it! 🔥💪"
+                f"Great work on refining this - now let's see you complete it! 💪"
             )
             
             del self.retry_storage[retry_key]
