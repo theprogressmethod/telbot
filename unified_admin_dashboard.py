@@ -2059,7 +2059,7 @@ def get_unified_admin_html():
             }}
             
             // TODO: Send to immutable audit log API
-            // fetch('/api/audit/commitment-changes', { method: 'POST', body: JSON.stringify(logEntry) });
+            // fetch('/api/audit/commitment-changes', {{ method: 'POST', body: JSON.stringify(logEntry) }});
         }}
         
         // ROLE MANAGEMENT FUNCTIONS
