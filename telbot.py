@@ -17,6 +17,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from supabase import create_client, Client
 import openai
+from smart_3_retry_system import Smart3RetrySystem
 
 # Load environment variables securely
 try:
@@ -132,8 +133,8 @@ except ValueError as e:
 bot = Bot(token=config.bot_token)
 dp = Dispatcher(storage=MemoryStorage())
 
-# Initialize SMART 3-retry system after bot is created
-smart_3_retry = Smart3RetrySystem(smart_analyzer, bot)
+# Initialize SMART 3-retry system - will be created after smart_analyzer
+smart_3_retry = None
 
 # Test database connection
 try:
@@ -419,9 +420,8 @@ class DatabaseManager:
 # Initialize analysis engine with secure config
 smart_analyzer = SmartAnalysis(config)
 
-# Initialize SMART 3-retry system for Week 1 enhancement
-from smart_3_retry_system import Smart3RetrySystem
-smart_3_retry = None  # Will be initialized after bot is created
+# Initialize SMART 3-retry system now that dependencies are ready
+smart_3_retry = Smart3RetrySystem(smart_analyzer, bot)
 
 # Initialize role manager
 from user_role_manager import UserRoleManager
