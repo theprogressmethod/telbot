@@ -119,18 +119,24 @@ class DashboardIntegration:
             # Get real pods for dropdown  
             real_pods = await self._get_real_pods_for_dropdown()
             
+            # Debug logging
+            logger.info(f"🔍 Data for injection - Users: {len(real_users)}, Pods: {len(real_pods)}")
+            logger.info(f"📋 Real users sample: {real_users[:2] if real_users else 'None'}")
+            logger.info(f"🏠 Real pods sample: {real_pods[:2] if real_pods else 'None'}")
+            
             # For now, use the existing unified admin HTML
             # In a full implementation, we'd inject the data into the HTML template
             html_content = get_unified_admin_html()
             
             # Simple data injection (in production, use proper templating)
+            import json
             html_content = html_content.replace(
                 "<!-- ADMIN_DATA_PLACEHOLDER -->", 
                 f"""
                 <script>
-                window.adminData = {admin_data};
-                window.realUsers = {real_users};
-                window.realPods = {real_pods};
+                window.adminData = {json.dumps(admin_data)};
+                window.realUsers = {json.dumps(real_users)};
+                window.realPods = {json.dumps(real_pods)};
                 console.log('Admin data loaded:', window.adminData);
                 console.log('Real users loaded:', window.realUsers);
                 console.log('Real pods loaded:', window.realPods);
