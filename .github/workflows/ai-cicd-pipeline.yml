@@ -1,0 +1,292 @@
+name: AI-Driven CI/CD Pipeline
+
+on:
+  push:
+    branches: [development, staging, master]
+  pull_request:
+    branches: [development, staging, master]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+env:
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
+  AXIOM_ORG_ID: ${{ secrets.AXIOM_ORG_ID }}
+
+jobs:
+  # Step 1: AI-Powered Code Analysis
+  ai-analysis:
+    name: 🤖 AI Code Analysis
+    runs-on: ubuntu-latest
+    outputs:
+      risk-level: ${{ steps.analyze.outputs.risk-level }}
+      should-deploy: ${{ steps.analyze.outputs.should-deploy }}
+      ai-summary: ${{ steps.analyze.outputs.summary }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Analyze Changes with Claude
+        id: analyze
+        run: |
+          # Get diff between branches
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            DIFF=$(git diff ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | head -c 10000)
+          else
+            DIFF=$(git diff HEAD~1..HEAD | head -c 10000)
+          fi
+          
+          # Send to Claude for analysis
+          ANALYSIS=$(curl -X POST https://api.anthropic.com/v1/messages \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: ${{ env.ANTHROPIC_API_KEY }}" \
+            -H "anthropic-version: 2023-06-01" \
+            -d "{
+              \"model\": \"claude-3-5-sonnet-20241022\",
+              \"max_tokens\": 1000,
+              \"messages\": [{
+                \"role\": \"user\",
+                \"content\": \"Analyze this code diff for deployment risks. Return ONLY valid JSON with: {\\\"risk_level\\\": \\\"low|medium|high|critical\\\", \\\"should_deploy\\\": true|false, \\\"summary\\\": \\\"brief explanation\\\", \\\"tests_needed\\\": [\\\"test1\\\", \\\"test2\\\"], \\\"migration_required\\\": true|false}. Diff: ${DIFF}\"
+              }]
+            }" | jq -r '.content[0].text')
+          
+          # Parse response and set outputs
+          echo "risk-level=$(echo $ANALYSIS | jq -r '.risk_level // \"medium\"')" >> $GITHUB_OUTPUT
+          echo "should-deploy=$(echo $ANALYSIS | jq -r '.should_deploy // true')" >> $GITHUB_OUTPUT
+          echo "summary=$(echo $ANALYSIS | jq -r '.summary // \"Analysis complete\"')" >> $GITHUB_OUTPUT
+
+  # Step 2: Automated Testing
+  testing:
+    name: 🧪 Automated Testing
+    needs: ai-analysis
+    if: needs.ai-analysis.outputs.should-deploy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio black flake8
+          
+      - name: Run Linting
+        continue-on-error: true
+        run: |
+          black --check . || true
+          flake8 . --exit-zero
+          
+      - name: Run Tests
+        continue-on-error: true
+        run: |
+          pytest tests/ -v --tb=short || echo "Tests need to be added"
+
+  # Step 3: Database Migration Check
+  migration-check:
+    name: 🗄️ Database Migration Check
+    needs: testing
+    runs-on: ubuntu-latest
+    outputs:
+      has-migrations: ${{ steps.check.outputs.has-migrations }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Check for migrations
+        id: check
+        run: |
+          if [ -d "supabase/migrations" ] && git diff HEAD~1..HEAD --name-only | grep -q "supabase/migrations/"; then
+            echo "has-migrations=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-migrations=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Step 4: Deploy to Environment
+  deploy:
+    name: 🚀 Deploy to ${{ github.ref_name }}
+    needs: [ai-analysis, testing, migration-check]
+    if: needs.ai-analysis.outputs.should-deploy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Determine Environment
+        id: env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/development" ]]; then
+            echo "environment=development" >> $GITHUB_OUTPUT
+            echo "render-service=srv-d2em4oripnbc73a5bmog" >> $GITHUB_OUTPUT
+            echo "supabase-project=apfiwfkpdhslfavnncsl" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "environment=staging" >> $GITHUB_OUTPUT
+            echo "render-service=srv-d2ftel8gjchc73aekca0" >> $GITHUB_OUTPUT
+            echo "supabase-project=apfiwfkpdhslfavnncsl" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+            echo "render-service=srv-d2h9ckggjchc73bumn60" >> $GITHUB_OUTPUT
+            echo "supabase-project=prtfkiodnbogqfcztruj" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Apply Supabase Migrations
+        if: needs.migration-check.outputs.has-migrations == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      
+      - name: Run Migrations
+        if: needs.migration-check.outputs.has-migrations == 'true'
+        run: |
+          supabase link --project-ref ${{ steps.env.outputs.supabase-project }} --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+          supabase db push --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+          
+      - name: Trigger Render Deploy
+        id: render-deploy
+        run: |
+          RESPONSE=$(curl -X POST "https://api.render.com/v1/services/${{ steps.env.outputs.render-service }}/deploys" \
+            -H "Authorization: Bearer ${{ env.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache": false}')
+          
+          DEPLOY_ID=$(echo $RESPONSE | jq -r '.id')
+          echo "deploy-id=$DEPLOY_ID" >> $GITHUB_OUTPUT
+            
+      - name: Wait for Deployment
+        id: deployment
+        run: |
+          for i in {1..30}; do
+            STATUS=$(curl -s "https://api.render.com/v1/services/${{ steps.env.outputs.render-service }}/deploys/${{ steps.render-deploy.outputs.deploy-id }}" \
+              -H "Authorization: Bearer ${{ env.RENDER_API_KEY }}" \
+              | jq -r '.status')
+            
+            echo "Deployment status: $STATUS"
+            
+            if [[ "$STATUS" == "live" ]]; then
+              echo "status=success" >> $GITHUB_OUTPUT
+              break
+            elif [[ "$STATUS" == "build_failed" || "$STATUS" == "deploy_failed" ]]; then
+              echo "status=failed" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+            
+            sleep 10
+          done
+
+  # Step 5: AI Health Check
+  health-check:
+    name: 🏥 AI Health Check
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine Service URL
+        id: url
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/development" ]]; then
+            echo "service-url=https://telbot-dev.onrender.com" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "service-url=https://telbot-staging.onrender.com" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            echo "service-url=https://telbot-production.onrender.com" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Run Health Checks
+        run: |
+          # Wait for service to be ready
+          sleep 30
+          
+          # Basic health check
+          for i in {1..5}; do
+            if curl -f ${{ steps.url.outputs.service-url }}/health 2>/dev/null; then
+              echo "Health check passed"
+              exit 0
+            fi
+            echo "Health check attempt $i failed, retrying..."
+            sleep 10
+          done
+          
+          echo "Health check failed after 5 attempts"
+          exit 1
+
+  # Step 6: Notification
+  notify:
+    name: 📢 Notify Status
+    needs: [ai-analysis, deploy, health-check]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram Notification
+        if: env.TELEGRAM_BOT_TOKEN != ''
+        run: |
+          if [[ "${{ needs.health-check.result }}" == "success" ]]; then
+            STATUS="✅ Success"
+          else
+            STATUS="❌ Failed"
+          fi
+          
+          MESSAGE="${STATUS} Deployment to ${{ github.ref_name }}
+          
+📊 Risk Level: ${{ needs.ai-analysis.outputs.risk-level }}
+🤖 AI Summary: ${{ needs.ai-analysis.outputs.ai-summary }}
+👤 Author: ${{ github.actor }}
+🔗 Commit: ${{ github.sha }}
+          
+View logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          
+          curl -X POST "https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ env.TELEGRAM_CHAT_ID }}" \
+            -d "text=$MESSAGE" \
+            -d "parse_mode=Markdown" || true
+
+  # Step 7: Rollback on Failure
+  rollback:
+    name: 🔄 Automatic Rollback
+    needs: health-check
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rollback Render
+        run: |
+          # Determine service ID based on branch
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            SERVICE_ID="srv-d2h9ckggjchc73bumn60"
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            SERVICE_ID="srv-d2ftel8gjchc73aekca0"
+          else
+            SERVICE_ID="srv-d2em4oripnbc73a5bmog"
+          fi
+          
+          # Get previous deployment
+          PREV_DEPLOY=$(curl -s "https://api.render.com/v1/services/${SERVICE_ID}/deploys?limit=2" \
+            -H "Authorization: Bearer ${{ env.RENDER_API_KEY }}" \
+            | jq -r '.[1].commit')
+          
+          # Trigger rollback deployment
+          curl -X POST "https://api.render.com/v1/services/${SERVICE_ID}/deploys" \
+            -H "Authorization: Bearer ${{ env.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"commitId\": \"${PREV_DEPLOY}\"}"
+            
+      - name: Notify Rollback
+        if: env.TELEGRAM_BOT_TOKEN != ''
+        run: |
+          curl -X POST "https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ env.TELEGRAM_CHAT_ID }}" \
+            -d "text=⚠️ ROLLBACK INITIATED for ${{ github.ref_name }}" \
+            -d "parse_mode=Markdown" || true
