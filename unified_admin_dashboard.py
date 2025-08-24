@@ -1810,6 +1810,44 @@ def get_unified_admin_html(admin_data=None):
                 }});
         }}
         
+        // LOAD DATA FROM API
+        async function loadRealData() {
+            console.log('🔄 Loading real data from API...');
+            
+            try {
+                // Load users
+                const usersResponse = await fetch('/api/crud/users');
+                const usersData = await usersResponse.json();
+                if (usersData.success) {
+                    window.realUsers = usersData.data;
+                    console.log('✅ Loaded', window.realUsers.length, 'users from API');
+                } else {
+                    console.error('❌ Failed to load users:', usersData.message);
+                    window.realUsers = [];
+                }
+                
+                // Load pods
+                const podsResponse = await fetch('/api/crud/pods');
+                const podsData = await podsResponse.json();
+                if (podsData.success) {
+                    window.realPods = podsData.data;
+                    console.log('✅ Loaded', window.realPods.length, 'pods from API');
+                } else {
+                    console.error('❌ Failed to load pods:', podsData.message);
+                    window.realPods = [];
+                }
+                
+                // Now populate dropdowns
+                populateDropdowns();
+                
+            } catch (error) {
+                console.error('❌ Error loading real data:', error);
+                window.realUsers = [];
+                window.realPods = [];
+                populateDropdowns(); // Still try to populate (will be empty)
+            }
+        }
+
         // POPULATE REAL DATA DROPDOWNS
         function populateDropdowns() {{
             console.log('🔧 populateDropdowns() called');
@@ -1866,13 +1904,13 @@ def get_unified_admin_html(admin_data=None):
         function ensureDropdownsPopulated() {{
             console.log('🔧 ensureDropdownsPopulated() called');
             
-            // Force immediate population
-            populateDropdowns();
+            // Load real data from API (which will call populateDropdowns)
+            loadRealData();
             
             // Additional attempts with delays
-            setTimeout(populateDropdowns, 100);
-            setTimeout(populateDropdowns, 500);
-            setTimeout(populateDropdowns, 1000);
+            setTimeout(loadRealData, 100);
+            setTimeout(loadRealData, 500);
+            setTimeout(loadRealData, 1000);
         }}
         
         // Auto-populate dropdowns on load (but don't auto-show profiles)
