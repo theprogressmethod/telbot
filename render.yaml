@@ -1,12 +1,74 @@
 services:
+  # Main Bot & API Service
   - type: web
-    name: telbot
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
-    plan: free
-    autoDeploy: true
+    name: tpm-bot-api
+    runtime: python
+    repo: https://github.com/theprogressmethod/telbot
+    branch: staging-clean
+    region: oregon
+    plan: standard
+    
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    
+    startCommand: |
+      python main_week1.py
+    
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        value: 8000
+      
+      # Secrets - set in Render dashboard
+      - key: BOT_TOKEN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+    
     healthCheckPath: /health
+    autoDeploy: true
+
+  # Dashboard Service
+  - type: web
+    name: tpm-dashboards
+    runtime: python
+    repo: https://github.com/theprogressmethod/telbot
+    branch: staging-clean
+    region: oregon
+    plan: standard
+    
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    
+    startCommand: |
+      python run_week1_dashboards.py
+    
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        value: 8001
+      
+      # Shared secrets with main service
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+    
+    healthCheckPath: /health
+    autoDeploy: true
