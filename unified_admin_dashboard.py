@@ -1,4 +1,4 @@
-def get_unified_admin_html():
+def get_unified_admin_html(admin_data=None):
     """Generate unified admin dashboard with Users and Pods tabs"""
     html_content = f"""
 <!DOCTYPE html>

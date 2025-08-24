@@ -121,17 +121,19 @@ async def user_dashboard(user_id: str):
         total_commitments = len(commitments)
         completed_commitments = len([c for c in commitments if c.get("status") == "completed"])
         
-        dashboard_data = {
-            "user": user,
-            "commitments": commitments,
-            "stats": {
-                "total_commitments": total_commitments,
-                "completed_commitments": completed_commitments,
-                "success_rate": round((completed_commitments / total_commitments * 100) if total_commitments > 0 else 0, 1)
-            }
+        # Format data for night sky SCOREBOARD template
+        user_data = {
+            "user_name": user.get("first_name", "User"),
+            "total_commitments": total_commitments,
+            "completed_commitments": completed_commitments,
+            "completion_rate": round((completed_commitments / total_commitments * 100) if total_commitments > 0 else 0, 1),
+            "current_streak": 0,  # TODO: Calculate actual streak
+            "pod_info": None,  # TODO: Get user's pod info
+            "achievements": [],  # TODO: Get user achievements
+            "recent_commitments": commitments[:5]  # Last 5 commitments
         }
         
-        return get_user_dashboard_html(dashboard_data)
+        return get_user_dashboard_html(user_data)
         
     except Exception as e:
         logger.error(f"Dashboard error: {e}")
@@ -165,7 +167,7 @@ async def admin_dashboard():
             }
         }
         
-        return get_unified_admin_html()
+        return get_unified_admin_html(admin_data)
         
     except Exception as e:
         logger.error(f"Admin dashboard error: {e}")
@@ -173,7 +175,16 @@ async def admin_dashboard():
 
 # Include CRUD API routes
 try:
-    crud_router = create_crud_router(supabase, None)  # pod_system not needed for Week 1 MVP
+    # Create simple pod system substitute for Week 1 MVP
+    class SimplePodSystem:
+        def __init__(self, supabase):
+            self.supabase = supabase
+        async def list_all_pods(self):
+            result = self.supabase.table("pods").select("*").order("created_at", desc=True).execute()
+            return result.data if result.data else []
+    
+    simple_pod_system = SimplePodSystem(supabase)
+    crud_router = create_crud_router(supabase, simple_pod_system)
     app.include_router(crud_router)
 except Exception as e:
     logger.error(f"Could not include CRUD router: {e}")
