@@ -91,12 +91,34 @@ async def root():
         "service": "Week 1 MVP - The Progress Method",
         "status": "✅ Running!",
         "timestamp": datetime.now().isoformat(),
+        "git_commit": "77a586d-admin-dropdown-fix",
+        "code_version": "main_week1.py-v3-with-loadRealData",
         "endpoints": {
             "health": "/health",
             "user_dashboard": "/dashboard?user_id=YOUR_USER_ID",
             "admin_dashboard": "/admin/week1",
-            "api_docs": "/docs"
+            "api_docs": "/docs",
+            "debug": "/debug"
         }
+    }
+
+@app.get("/debug")
+async def debug_info():
+    """Debug endpoint to verify deployment state"""
+    return {
+        "service": "Week 1 MVP Debug",
+        "admin_key_set": bool(admin_key),
+        "supabase_url": supabase_url[:20] + "..." if supabase_url else None,
+        "bot_token_set": bool(os.getenv("BOT_TOKEN")),
+        "environment_vars": {
+            "PORT": os.getenv("PORT"),
+            "ADMIN_API_KEY_length": len(admin_key) if admin_key else 0,
+        },
+        "functions_available": [
+            "get_user_dashboard_html",
+            "get_unified_admin_html",
+            "SimplePodSystem",
+        ]
     }
 
 # User Dashboard Route

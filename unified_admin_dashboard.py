@@ -6,7 +6,7 @@ def get_unified_admin_html(admin_data=None):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ADMIN CONTROL • THE PROGRESS METHOD</title>
+    <title>ADMIN CONTROL • THE PROGRESS METHOD v3-loadRealData</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;400;700&display=swap');
         
@@ -1812,7 +1812,7 @@ def get_unified_admin_html(admin_data=None):
         
         // LOAD DATA FROM API
         async function loadRealData() {
-            console.log('🔄 Loading real data from API...');
+            console.log('🔄 Loading real data from API... (loadRealData function v3)');
             
             try {
                 // Load users
