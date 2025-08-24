@@ -1,168 +1,329 @@
-# AI-Driven CI/CD Deployment Guide
+# 🚀 AI-Driven CI/CD Deployment Guide
 
-## 🚀 Overview
+## Overview
 
-This repository uses a **95% AI-automated CI/CD pipeline** powered by Claude AI, GitHub Actions, Render, and Supabase.
-
-## 📊 Architecture
-
-```
-GitHub → AI Analysis → Tests → Deploy → Monitor
-  ↓         ↓           ↓        ↓         ↓
-Branch   Claude AI   Pytest   Render    Axiom
-```
+This project uses a **95% AI-automated** CI/CD pipeline powered by Claude AI, GitHub Actions, Render, and Supabase.
 
 ## 🔄 Deployment Flow
 
-### 1. Development Environment
-- **Branch**: `development`
-- **URL**: https://telbot-dev.onrender.com
-- **Database**: Supabase Dev (apfiwfkpdhslfavnncsl)
-- **Auto-deploy**: On every push
-
-### 2. Staging Environment  
-- **Branch**: `staging`
-- **URL**: https://telbot-staging.onrender.com
-- **Database**: Supabase Dev (apfiwfkpdhslfavnncsl)
-- **Auto-deploy**: On PR merge from development
-
-### 3. Production Environment
-- **Branch**: `master`
-- **URL**: https://telbot-production.onrender.com
-- **Database**: Supabase Prod (prtfkiodnbogqfcztruj)
-- **Auto-deploy**: On PR merge from staging
-
-## 🤖 AI Features
-
-1. **Risk Analysis**: Every change is analyzed by Claude for deployment risks
-2. **Auto-decision**: AI decides if deployment should proceed
-3. **Test Analysis**: Failed tests are analyzed with fix suggestions
-4. **Health Monitoring**: AI-powered health checks after deployment
-5. **Auto-rollback**: Automatic rollback on failures
-
-## 📝 Workflow
-
-### For Developers
-
-1. **Create feature branch** from `development`
-   ```bash
-   git checkout -b feature/my-feature development
-   ```
-
-2. **Push changes**
-   ```bash
-   git add .
-   git commit -m "feat: Add new feature"
-   git push origin feature/my-feature
-   ```
-
-3. **Create PR** to `development`
-   - AI automatically reviews code
-   - Tests run automatically
-   - Merge when checks pass
-
-4. **Deploy to Staging**
-   - Create PR from `development` to `staging`
-   - AI validates changes
-   - Auto-deploys on merge
-
-5. **Deploy to Production**
-   - Create PR from `staging` to `master`
-   - Requires manual approval
-   - Auto-deploys on merge
-
-## 🔑 Required Secrets
-
-Configure these in GitHub Settings → Secrets:
-
-| Secret | Description | Required |
-|--------|-------------|----------|
-| `ANTHROPIC_API_KEY` | Claude AI API key | ✅ |
-| `RENDER_API_KEY` | Render.com API key | ✅ |
-| `SUPABASE_ACCESS_TOKEN` | Supabase access token | ✅ |
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token | Optional |
-| `TELEGRAM_CHAT_ID` | Telegram chat ID | Optional |
-| `AXIOM_TOKEN` | Axiom logging token | Optional |
-| `AXIOM_ORG_ID` | Axiom organization ID | Optional |
-
-## 🛠️ Manual Commands
-
-### Force Deployment
-```bash
-gh workflow run ai-cicd-pipeline.yml -f environment=production
+```mermaid
+graph LR
+    A[Development] -->|PR + AI Review| B[Staging]
+    B -->|PR + Approval| C[Production]
+    C -->|Auto-Rollback on Failure| B
 ```
 
-### Check Status
+### Environment Branches
+
+| Environment | Branch | URL | Auto-Deploy |
+|------------|--------|-----|-------------|
+| Development | `development` | https://telbot-dev.onrender.com | ✅ On push |
+| Staging | `staging` | https://telbot-staging.onrender.com | ✅ On merge |
+| Production | `master` | https://telbot-production.onrender.com | ✅ On merge (with approval) |
+
+## 📋 Deployment Process
+
+### 1️⃣ Development Deployment
+
 ```bash
-gh run list --workflow=ai-cicd-pipeline.yml
+# Make changes
+git add .
+git commit -m "feat: your feature"
+git push origin development
 ```
 
-### View Logs
+**What happens automatically:**
+- 🤖 Claude analyzes code for risks
+- 🧪 Tests run automatically
+- 📦 Deploys to dev environment if safe
+- 💬 Telegram notification sent
+
+### 2️⃣ Staging Deployment
+
 ```bash
-gh run view [run-id] --log
+# Create PR from development to staging
+gh pr create --base staging --head development --title "Deploy to staging"
+```
+
+**What happens automatically:**
+- 🤖 Claude reviews the PR
+- 🔍 Checks for database migrations
+- 🧪 Runs integration tests
+- 📦 Auto-deploys on merge
+- 💬 Notifies team via Telegram
+
+### 3️⃣ Production Deployment
+
+```bash
+# Create PR from staging to master
+gh pr create --base master --head staging --title "Deploy to production"
+```
+
+**What happens automatically:**
+- 🤖 Claude performs deep analysis
+- ⚠️ Requires manual approval
+- 🧪 Full test suite runs
+- 📦 Deploys with health checks
+- 🔄 Auto-rollback if health check fails
+- 💬 Critical notifications sent
+
+## 🛠️ Manual Deployment
+
+For emergency deployments or testing:
+
+```bash
+# Trigger manual deployment
+gh workflow run manual-deploy.yml \
+  -f environment=production \
+  -f skip_tests=false \
+  -f force_deploy=false \
+  -f reason="Emergency fix for critical bug"
 ```
 
 ## 📊 Monitoring
 
-### Render Dashboard
-- Development: [View](https://dashboard.render.com/web/srv-d2em4oripnbc73a5bmog)
-- Staging: [View](https://dashboard.render.com/web/srv-d2ftel8gjchc73aekca0)
-- Production: [View](https://dashboard.render.com/web/srv-d2h9ckggjchc73bumn60)
+### Check Deployment Status
 
-### GitHub Actions
-- [View Workflows](https://github.com/theprogressmethod/telbot/actions)
+```bash
+# View recent deployments
+gh run list --workflow=ai-cicd-pipeline.yml --limit=5
 
-### Supabase
-- Dev: [Dashboard](https://app.supabase.com/project/apfiwfkpdhslfavnncsl)
-- Prod: [Dashboard](https://app.supabase.com/project/prtfkiodnbogqfcztruj)
+# Watch deployment in real-time
+gh run watch
+
+# View logs for specific run
+gh run view [run-id] --log
+```
+
+### Health Checks
+
+```bash
+# Check service health
+curl https://telbot-dev.onrender.com/health
+curl https://telbot-staging.onrender.com/health
+curl https://telbot-production.onrender.com/health
+```
+
+### Telegram Notifications
+
+All deployments send notifications to Telegram with:
+- ✅/❌ Success/Failure status
+- 📊 Risk level assessment
+- 🤖 AI summary of changes
+- 🔗 Link to GitHub Actions run
+
+## 🔄 Rollback Procedures
+
+### Automatic Rollback
+
+Triggered automatically when:
+- Health check fails after deployment
+- Critical error detected
+- Service doesn't respond within 5 minutes
+
+### Manual Rollback
+
+#### Option 1: Via GitHub (Recommended)
+
+```bash
+# Revert the merge commit
+git revert -m 1 HEAD
+git push origin master
+```
+
+#### Option 2: Via Render Dashboard
+
+1. Go to [Render Dashboard](https://dashboard.render.com)
+2. Select the service (telbot-production)
+3. Click "Deploys" tab
+4. Find previous successful deployment
+5. Click "Redeploy"
+
+#### Option 3: Via API
+
+```bash
+# Get deployment history
+curl -H "Authorization: Bearer $RENDER_API_KEY" \
+  https://api.render.com/v1/services/srv-d2h9ckggjchc73bumn60/deploys
+
+# Redeploy specific commit
+curl -X POST \
+  -H "Authorization: Bearer $RENDER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"commitId": "PREVIOUS_COMMIT_SHA"}' \
+  https://api.render.com/v1/services/srv-d2h9ckggjchc73bumn60/deploys
+```
+
+### Database Rollback
+
+```bash
+# Connect to Supabase
+supabase link --project-ref prtfkiodnbogqfcztruj
+
+# List migrations
+supabase migration list
+
+# Create down migration
+supabase migration new rollback_[migration_name]
+
+# Apply rollback
+supabase db push
+```
+
+## 🔑 Environment Variables
+
+### Required Secrets in GitHub
+
+| Secret | Description | Where to Get |
+|--------|-------------|-------------|
+| `ANTHROPIC_API_KEY` | Claude AI API key | https://console.anthropic.com |
+| `RENDER_API_KEY` | Render deployment key | https://dashboard.render.com/account/api-keys |
+| `TELEGRAM_BOT_TOKEN` | Bot token for notifications | @BotFather on Telegram |
+| `TELEGRAM_CHAT_ID` | Chat ID for notifications | Use @userinfobot |
+| `SUPABASE_ACCESS_TOKEN` | Supabase CLI token | https://app.supabase.com/account/tokens |
+
+### Service-Specific Variables
+
+Set these in Render Dashboard for each service:
+
+```env
+# Database
+SUPABASE_URL=https://[project].supabase.co
+SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_KEY=eyJ...
+
+# Telegram
+TELEGRAM_BOT_TOKEN=bot_token_here
+WEBHOOK_URL=https://service.onrender.com/webhook
+
+# Environment
+ENVIRONMENT=development|staging|production
+LOG_LEVEL=INFO
+```
+
+## 🧪 Testing
+
+### Run Tests Locally
+
+```bash
+# Install test dependencies
+pip install -r requirements-test.txt
+
+# Run all tests
+pytest
+
+# Run specific test categories
+pytest -m health  # Health checks only
+pytest -m bot     # Bot tests only
+pytest -m api     # API tests only
+
+# Run with coverage
+pytest --cov=. --cov-report=html
+```
+
+### Test in CI/CD
+
+Tests run automatically on:
+- Every push to development/staging/master
+- Every pull request
+- Manual workflow dispatch
 
 ## 🚨 Troubleshooting
 
-### Deployment Failed
-1. Check GitHub Actions logs
-2. Review Telegram notifications
-3. Check Render logs
+### Common Issues
 
-### Database Migration Failed
-1. Test locally: `supabase db reset`
-2. Check migration syntax
-3. Review Supabase logs
+#### Deployment Stuck
 
-### Health Check Failed
-- Auto-rollback initiated
-- Check `/health` endpoint
-- Review application logs
-
-### Rollback Needed
 ```bash
-# Manual rollback via Render
-curl -X POST "https://api.render.com/v1/services/[SERVICE_ID]/deploys" \
-  -H "Authorization: Bearer [RENDER_API_KEY]" \
-  -d '{"commitId": "[PREVIOUS_COMMIT]"}'
+# Check GitHub Actions
+gh run list --workflow=ai-cicd-pipeline.yml
+
+# Check Render logs
+curl -H "Authorization: Bearer $RENDER_API_KEY" \
+  https://api.render.com/v1/services/[service-id]/deploys/[deploy-id]
 ```
 
-## 📈 Success Metrics
+#### Health Check Failing
 
-- ✅ 95%+ deployments automated
-- ✅ < 5 minute deployment time
-- ✅ Zero-downtime deployments
-- ✅ Automatic rollback on failures
-- ✅ AI-powered risk assessment
+1. Check service logs in Render
+2. Verify environment variables
+3. Test database connection
+4. Check Telegram webhook
 
-## 🆘 Support
+#### AI Analysis Failing
 
-- **GitHub Issues**: [Create Issue](https://github.com/theprogressmethod/telbot/issues)
-- **Telegram**: Notifications sent to configured chat
-- **Logs**: Check Axiom dashboard (if configured)
+1. Verify `ANTHROPIC_API_KEY` is set
+2. Check API quota
+3. Reduce diff size (commit smaller changes)
 
-## 📚 Resources
+#### Database Migration Failed
+
+```bash
+# Check migration status
+supabase migration list
+
+# Reset to clean state (dev only)
+supabase db reset
+
+# Apply migrations manually
+supabase migration up
+```
+
+## 📈 Performance Metrics
+
+### Success Criteria
+
+- ✅ 95%+ deployments succeed without manual intervention
+- ⏱️ < 5 minute deployment time
+- 🔄 Zero-downtime deployments
+- 🛡️ Automatic rollback on failures
+- 📊 AI risk assessment accuracy > 90%
+
+### Current Performance
+
+| Metric | Target | Current |
+|--------|--------|----------|
+| Automation Rate | 95% | - |
+| Deploy Time | < 5 min | - |
+| Success Rate | > 95% | - |
+| Rollback Time | < 2 min | - |
+
+## 🔐 Security
+
+### Best Practices
+
+1. **Never commit secrets** - Use GitHub Secrets
+2. **Review AI suggestions** - Don't blindly trust
+3. **Test in staging** - Always test before production
+4. **Monitor alerts** - Watch Telegram notifications
+5. **Regular backups** - Supabase handles automatically
+
+### Security Scanning
+
+Automatic scanning for:
+- API keys in code
+- SQL injection vulnerabilities
+- Dangerous operations (DROP TABLE, rm -rf)
+- Exposed credentials
+
+## 📚 Additional Resources
 
 - [GitHub Actions Docs](https://docs.github.com/en/actions)
 - [Render Docs](https://render.com/docs)
 - [Supabase Docs](https://supabase.com/docs)
 - [Claude API Docs](https://docs.anthropic.com)
+- [Telegram Bot API](https://core.telegram.org/bots/api)
+
+## 🆘 Support
+
+For issues or questions:
+
+1. Check this guide
+2. Review GitHub Actions logs
+3. Check Telegram for notifications
+4. Contact the team
 
 ---
 
-**Last Updated**: August 2025
-**Maintained by**: The Progress Method
+*Last updated: December 2024*
+*Version: 1.0.0*
