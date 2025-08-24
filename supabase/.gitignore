@@ -1,0 +1,10 @@
+# Supabase
+.branches
+.temp
+.env
+.env.local
+
+# Ignore local development files
+.DS_Store
+*.log
+*.sql.bak

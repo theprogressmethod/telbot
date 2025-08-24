@@ -1,69 +1,73 @@
-# Supabase Configuration for CI/CD
+# A standard Supabase project configured to use Auth
+# https://supabase.com/docs/guides/cli/getting-started
 
 [project]
-# Production project
-id = "prtfkiodnbogqfcztruj"
+id = "apfiwfkpdhslfavnncsl"  # Development project ID
 
 [api]
 enabled = true
 port = 54321
 schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
 
 [db]
 port = 54322
 major_version = 15
+pooler_enabled = false
 
-[db.pooler]
-enabled = false
-port = 54329
-pool_mode = "transaction"
-default_pool_size = 20
-max_client_conn = 100
-
-[realtime]
+[studio]
 enabled = true
-ip_version = "IPv4"
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
 
 [auth]
 site_url = "http://localhost:3000"
 additional_redirect_urls = [
-  "https://telbot-production.onrender.com",
-  "https://telbot-staging.onrender.com",
-  "https://telbot-dev.onrender.com"
+  "https://telbot-dev.onrender.com/auth/callback",
+  "https://telbot-staging.onrender.com/auth/callback",
+  "https://telbot-production.onrender.com/auth/callback"
 ]
-jwt_secret = "super-secret-jwt-token"
+jwt_expiry = 3600
+enable_signup = true
+enable_anonymous_sign_ins = false
 
 [auth.email]
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = true
 
-[auth.sms]
-enable_signup = false
-enable_confirmations = false
-
-[storage]
-enabled = true
-
-[studio]
-enabled = true
-port = 54323
-
-# Branch-specific configurations
-[remotes.production]
-project_id = "prtfkiodnbogqfcztruj"
-
-[remotes.development]
-project_id = "apfiwfkpdhslfavnncsl"
-
-# Function configuration
-[functions]
-node_version = 18
-
-# Observability
 [analytics]
 enabled = false
 
-# Experimental features
-[experimental]
-webhooks_enabled = true
+# Remote configurations for different environments
+[remotes.production]
+project_id = "prtfkiodnbogqfcztruj"
+url = "https://prtfkiodnbogqfcztruj.supabase.co"
+
+[remotes.staging]
+# Will be created as a branch from production
+seed_script = "./supabase/seeds/staging.sql"
+
+[remotes.development]
+# Current development project
+project_id = "apfiwfkpdhslfavnncsl"
+url = "https://apfiwfkpdhslfavnncsl.supabase.co"
+seed_script = "./supabase/seeds/development.sql"
+
+# Function configuration
+[functions]
+node_version = 20
+
+# Database settings
+[db.pooler]
+enabled = true
+default_pool_size = 25
+max_pool_size = 50
