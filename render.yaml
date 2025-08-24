@@ -4,7 +4,7 @@ services:
     name: tpm-bot-api
     runtime: python
     repo: https://github.com/theprogressmethod/telbot
-    branch: staging-clean
+    branch: staging
     region: oregon
     plan: standard
     
@@ -43,7 +43,7 @@ services:
     name: tpm-dashboards
     runtime: python
     repo: https://github.com/theprogressmethod/telbot
-    branch: staging-clean
+    branch: staging
     region: oregon
     plan: standard
     
