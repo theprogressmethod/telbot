@@ -1,0 +1,185 @@
+name: Manual Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target Environment'
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      skip_tests:
+        description: 'Skip tests (use with caution)'
+        required: false
+        type: boolean
+        default: false
+      force_deploy:
+        description: 'Force deployment even if AI says no'
+        required: false
+        type: boolean
+        default: false
+      reason:
+        description: 'Reason for manual deployment'
+        required: true
+        type: string
+
+jobs:
+  validate:
+    name: 🔍 Validate Deployment Request
+    runs-on: ubuntu-latest
+    outputs:
+      proceed: ${{ steps.validate.outputs.proceed }}
+    steps:
+      - name: Check permissions
+        id: validate
+        run: |
+          echo "🔍 Validating deployment request..."
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Skip Tests: ${{ inputs.skip_tests }}"
+          echo "Force Deploy: ${{ inputs.force_deploy }}"
+          echo "Reason: ${{ inputs.reason }}"
+          
+          # Production deployments require extra validation
+          if [[ "${{ inputs.environment }}" == "production" ]]; then
+            if [[ "${{ inputs.skip_tests }}" == "true" ]]; then
+              echo "⚠️ WARNING: Skipping tests for production deployment!"
+            fi
+            
+            if [[ "${{ inputs.force_deploy }}" == "true" ]]; then
+              echo "⚠️ WARNING: Forcing production deployment against AI recommendation!"
+            fi
+            
+            echo "🔐 Production deployment requested by ${{ github.actor }}"
+          fi
+          
+          echo "proceed=true" >> $GITHUB_OUTPUT
+
+  deploy:
+    name: 🚀 Deploy to ${{ inputs.environment }}
+    needs: validate
+    if: needs.validate.outputs.proceed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set environment variables
+        id: env
+        run: |
+          if [[ "${{ inputs.environment }}" == "development" ]]; then
+            echo "branch=development" >> $GITHUB_OUTPUT
+            echo "render-service=srv-d2em4oripnbc73a5bmog" >> $GITHUB_OUTPUT
+            echo "service-url=https://telbot-dev.onrender.com" >> $GITHUB_OUTPUT
+          elif [[ "${{ inputs.environment }}" == "staging" ]]; then
+            echo "branch=staging" >> $GITHUB_OUTPUT
+            echo "render-service=srv-d2ftel8gjchc73aekca0" >> $GITHUB_OUTPUT
+            echo "service-url=https://telbot-staging.onrender.com" >> $GITHUB_OUTPUT
+          elif [[ "${{ inputs.environment }}" == "production" ]]; then
+            echo "branch=master" >> $GITHUB_OUTPUT
+            echo "render-service=srv-d2h9ckggjchc73bumn60" >> $GITHUB_OUTPUT
+            echo "service-url=https://telbot-production.onrender.com" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Checkout target branch
+        run: |
+          git fetch origin ${{ steps.env.outputs.branch }}
+          git checkout ${{ steps.env.outputs.branch }}
+      
+      - name: Run tests
+        if: inputs.skip_tests == false
+        run: |
+          echo "🧪 Running tests..."
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+          
+          if [ -d "tests" ]; then
+            pytest tests/ -v || echo "Tests failed but continuing..."
+          else
+            echo "No tests found"
+          fi
+      
+      - name: AI Analysis
+        if: inputs.force_deploy == false
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "🤖 Getting AI approval..."
+          
+          ANALYSIS=$(curl -s -X POST https://api.anthropic.com/v1/messages \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d @- <<EOF | jq -r '.content[0].text' || echo '{"approve":true}'
+          {
+            "model": "claude-3-5-sonnet-20241022",
+            "max_tokens": 200,
+            "messages": [{
+              "role": "user",
+              "content": "Should I deploy to ${{ inputs.environment }}? Reason: ${{ inputs.reason }}. Reply with JSON: {approve: true/false, reason: 'brief explanation'}"
+            }]
+          }
+          EOF
+          )
+          
+          APPROVE=$(echo "$ANALYSIS" | jq -r '.approve // true')
+          
+          if [[ "$APPROVE" != "true" ]]; then
+            echo "❌ AI recommends against deployment"
+            echo "Reason: $(echo "$ANALYSIS" | jq -r '.reason // "No reason provided"')"
+            exit 1
+          fi
+          
+          echo "✅ AI approved deployment"
+      
+      - name: Trigger Render deployment
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          echo "🚀 Triggering deployment to ${{ inputs.environment }}..."
+          
+          RESPONSE=$(curl -s -X POST "https://api.render.com/v1/services/${{ steps.env.outputs.render-service }}/deploys" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache": false}')
+          
+          DEPLOY_ID=$(echo "$RESPONSE" | jq -r '.id // empty')
+          
+          if [ -z "$DEPLOY_ID" ]; then
+            echo "❌ Failed to trigger deployment"
+            echo "$RESPONSE"
+            exit 1
+          fi
+          
+          echo "✅ Deployment triggered: $DEPLOY_ID"
+          echo "deploy-id=$DEPLOY_ID" >> $GITHUB_OUTPUT
+      
+      - name: Send notification
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [[ "${{ job.status }}" == "success" ]]; then
+            STATUS="✅ Success"
+          else
+            STATUS="❌ Failed"
+          fi
+          
+          MESSAGE="📌 *Manual Deployment $STATUS*
+          
+          🎯 Environment: ${{ inputs.environment }}
+          👤 Triggered by: ${{ github.actor }}
+          📝 Reason: ${{ inputs.reason }}
+          ⚡ Skip Tests: ${{ inputs.skip_tests }}
+          💪 Force Deploy: ${{ inputs.force_deploy }}
+          
+          [View Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -d "chat_id=$TELEGRAM_CHAT_ID" \
+            -d "text=$MESSAGE" \
+            -d "parse_mode=Markdown" \
+            -d "disable_web_page_preview=true" || echo "Telegram notification failed"

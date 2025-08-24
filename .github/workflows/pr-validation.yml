@@ -1,92 +1,167 @@
-name: PR Validation
+name: PR Validation & AI Review
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  pull_request_review_comment:
+    types: [created]
 
 jobs:
-  validate:
-    name: ✅ Validate PR
+  ai-review:
+    name: 🤖 AI Code Review
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Analyze PR with Claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get PR diff
+          DIFF=$(gh pr diff ${{ github.event.pull_request.number }} || echo "Failed to get diff")
+          
+          # Limit diff size
+          DIFF_SUMMARY=$(echo "$DIFF" | head -c 15000)
+          
+          # Analyze with Claude
+          ANALYSIS=$(curl -s -X POST https://api.anthropic.com/v1/messages \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d @- <<EOF | jq -r '.content[0].text' || echo "Analysis failed"
+          {
+            "model": "claude-3-5-sonnet-20241022",
+            "max_tokens": 1000,
+            "messages": [{
+              "role": "user",
+              "content": "Review this PR diff. Provide: 1) Security issues 2) Performance concerns 3) Best practice violations 4) Suggestions. Be concise. Diff:\n\n$DIFF_SUMMARY"
+            }]
+          }
+          EOF
+          )
+          
+          # Post as PR comment
+          if [ -n "$ANALYSIS" ] && [ "$ANALYSIS" != "Analysis failed" ]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body "## 🤖 AI Code Review\n\n$ANALYSIS"
+          fi
+
+  check-migrations:
+    name: 📊 Check for Migrations
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Check for Breaking Changes
-        id: breaking
+          
+      - name: Check for database migrations
         run: |
-          # Check for breaking changes in migrations
           if git diff origin/${{ github.base_ref }}...HEAD --name-only | grep -q "supabase/migrations/"; then
             echo "⚠️ This PR contains database migrations"
-            echo "Please ensure backward compatibility"
-            echo "has-migrations=true" >> $GITHUB_OUTPUT
-          else
-            echo "has-migrations=false" >> $GITHUB_OUTPUT
+            echo "Please ensure:"
+            echo "1. Migrations are backward compatible"
+            echo "2. Migrations have been tested locally"
+            echo "3. Rollback procedure is documented"
+            
+            # Post warning comment
+            gh pr comment ${{ github.event.pull_request.number }} \
+              --body "⚠️ **Database Migration Detected**\n\nThis PR contains database migrations. Please ensure:\n- [ ] Migrations are backward compatible\n- [ ] Tested locally with \`supabase db reset\`\n- [ ] Rollback procedure documented\n- [ ] No breaking changes for existing data"
           fi
-          
-      - name: Python Setup
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test-suite:
+    name: 🧪 Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
           
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install black flake8 pytest
+          pip install pytest pytest-cov black flake8 mypy
           
-      - name: Code Quality Check
+      - name: Run tests
         run: |
-          echo "🔍 Running code quality checks..."
-          black --check . || echo "⚠️ Code formatting issues found. Run 'black .' to fix."
-          flake8 . --exit-zero --statistics
+          # Create tests directory if it doesn't exist
+          mkdir -p tests
           
-      - name: Run Tests
-        continue-on-error: true
-        run: |
-          if [ -d "tests" ]; then
-            pytest tests/ -v --tb=short || echo "⚠️ Some tests failed"
+          # Run linting
+          black --check . || true
+          flake8 . --count --exit-zero --statistics
+          
+          # Run tests if they exist
+          if [ "$(ls -A tests)" ]; then
+            pytest tests/ -v --tb=short
           else
-            echo "ℹ️ No tests directory found"
+            echo "No tests found, skipping"
           fi
-          
-      - name: Security Check
+
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run security checks
         run: |
-          pip install bandit
-          bandit -r . -f json -o bandit-report.json || true
-          if [ -f bandit-report.json ]; then
-            echo "🔒 Security scan complete"
+          # Install safety for Python vulnerability scanning
+          pip install safety
+          
+          # Check for known vulnerabilities
+          safety check --json || true
+          
+          # Check for secrets
+          if grep -r "sk-[a-zA-Z0-9]\{48\}" . --exclude-dir=.git; then
+            echo "⚠️ Potential API key found!"
+            exit 1
           fi
           
-      - name: PR Comment
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const hasMigrations = '${{ steps.breaking.outputs.has-migrations }}' === 'true';
-            
-            let comment = '## 🤖 Automated PR Review\n\n';
-            comment += '### ✅ Checks Completed\n';
-            comment += '- Code quality check\n';
-            comment += '- Security scan\n';
-            comment += '- Test execution\n\n';
-            
-            if (hasMigrations) {
-              comment += '### ⚠️ Database Migrations Detected\n';
-              comment += 'This PR contains database migrations. Please ensure:\n';
-              comment += '- Migrations are backward compatible\n';
-              comment += '- Rollback scripts are provided if needed\n';
-              comment += '- Testing has been done locally\n\n';
-            }
-            
-            comment += '### 📋 Next Steps\n';
-            comment += '1. Review the automated checks above\n';
-            comment += '2. Request human review if needed\n';
-            comment += '3. Merge when all checks pass\n';
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            })
+          if grep -r "SUPABASE_SERVICE_KEY" . --exclude-dir=.git --exclude="*.yml" --exclude="*.yaml"; then
+            echo "⚠️ Potential Supabase service key found in code!"
+            exit 1
+          fi
+
+  pr-status:
+    name: 📋 PR Status Check
+    needs: [ai-review, check-migrations, test-suite, security-scan]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "## PR Validation Summary"
+          echo ""
+          
+          if [[ "${{ needs.ai-review.result }}" == "success" ]]; then
+            echo "✅ AI Review: Passed"
+          else
+            echo "❌ AI Review: Failed"
+          fi
+          
+          if [[ "${{ needs.test-suite.result }}" == "success" ]]; then
+            echo "✅ Tests: Passed"
+          else
+            echo "⚠️ Tests: Failed or Skipped"
+          fi
+          
+          if [[ "${{ needs.security-scan.result }}" == "success" ]]; then
+            echo "✅ Security: Passed"
+          else
+            echo "❌ Security: Issues Found"
+          fi
+          
+          # Set overall status
+          if [[ "${{ needs.security-scan.result }}" == "failure" ]]; then
+            echo "❌ PR cannot be merged due to security issues"
+            exit 1
+          fi
