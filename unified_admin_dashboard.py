@@ -1169,7 +1169,7 @@ def get_unified_admin_html(admin_data=None):
             if (query.length < 2) return;
             
             // Simulate search suggestions
-            console.log('Searching for users:', query);
+            console.log("Searching for users:', query);
             
             // Show example users based on search
             if (query.toLowerCase().includes('sarah') || query.toLowerCase().includes('chen')) {{
@@ -1186,7 +1186,7 @@ def get_unified_admin_html(admin_data=None):
             document.getElementById('userProfile').classList.add('active');
             
             // Simulate loading user data
-            console.log('Loading user profile for:', query);
+            console.log("Loading user profile for:', query);
         }}
         
         function loadExampleUser(type) {{
@@ -1233,7 +1233,7 @@ def get_unified_admin_html(admin_data=None):
                 }}
             }}
             
-            console.log('🔄 Saving user account changes for user:', currentUserId, userData);
+            console.log("🔄 Saving user account changes for user:', currentUserId, userData);
             
             // Make API call to update user
             fetch(`/api/crud/users/${{currentUserId}}`, {{
@@ -1245,18 +1245,18 @@ def get_unified_admin_html(admin_data=None):
             .then(data => {{
                 if (data.success) {{
                     alert('User changes saved successfully!');
-                    console.log('✅ User updated:', data);
+                    console.log("✅ User updated:', data);
                     
                     // Handle status changes (role management)
                     if (statusSelect && statusSelect.value) {{
-                        console.log('🔄 Handling status change to:', statusSelect.value);
+                        console.log("🔄 Handling status change to:', statusSelect.value);
                         // Status changes are handled through role management
                         // This would require additional API calls to add/remove roles
                     }}
                     
                     // Handle pod assignment changes
                     if (podSelect && podSelect.value !== currentPodId) {{
-                        console.log('🔄 Handling pod assignment change from:', currentPodId, 'to:', podSelect.value);
+                        console.log("🔄 Handling pod assignment change from:', currentPodId, 'to:', podSelect.value);
                         
                         // Remove from current pod if assigned
                         if (currentPodId) {{
@@ -1266,7 +1266,7 @@ def get_unified_admin_html(admin_data=None):
                             .then(response => response.json())
                             .then(data => {{
                                 if (data.success) {{
-                                    console.log('✅ Removed from old pod:', currentPodId);
+                                    console.log("✅ Removed from old pod:', currentPodId);
                                 }} else {{
                                     console.error('❌ Failed to remove from old pod:', data.message);
                                 }}
@@ -1282,7 +1282,7 @@ def get_unified_admin_html(admin_data=None):
                             .then(response => response.json())
                             .then(data => {{
                                 if (data.success) {{
-                                    console.log('✅ Added to new pod:', podSelect.value);
+                                    console.log("✅ Added to new pod:', podSelect.value);
                                 }} else {{
                                     console.error('❌ Failed to add to new pod:', data.message);
                                     alert('Error assigning to pod: ' + (data.message || 'Unknown error'));
@@ -1311,7 +1311,7 @@ def get_unified_admin_html(admin_data=None):
         function updateNotes() {{
             // Simulate API call to update admin notes
             alert('Admin notes updated successfully!');
-            console.log('Updating admin notes...');
+            console.log("Updating admin notes...');
         }}
         
         // POD FUNCTIONS
@@ -1319,7 +1319,7 @@ def get_unified_admin_html(admin_data=None):
             if (query.length < 2) return;
             
             // Simulate search suggestions
-            console.log('Searching for pods:', query);
+            console.log("Searching for pods:', query);
             
             // Show example pods based on search
             if (query.toLowerCase().includes('alpha')) {{
@@ -1336,7 +1336,7 @@ def get_unified_admin_html(admin_data=None):
             document.getElementById('podProfile').classList.add('active');
             
             // Simulate loading pod data
-            console.log('Loading pod profile for:', query);
+            console.log("Loading pod profile for:', query);
         }}
         
         function loadExamplePod(type) {{
@@ -1369,7 +1369,7 @@ def get_unified_admin_html(admin_data=None):
             if (podNameField) podData.name = podNameField.value;
             if (statusSelect) podData.status = statusSelect.value;
             
-            console.log('🔄 Saving pod settings for pod:', podId, podData);
+            console.log("🔄 Saving pod settings for pod:', podId, podData);
             
             // Make API call to update pod
             fetch(`/api/crud/pods/${{podId}}`, {{
@@ -1381,7 +1381,7 @@ def get_unified_admin_html(admin_data=None):
             .then(data => {{
                 if (data.success) {{
                     alert('Pod settings saved successfully!');
-                    console.log('✅ Pod updated:', data);
+                    console.log("✅ Pod updated:', data);
                     
                     // Reload pod data to show updated information
                     loadPodById(podId);
@@ -1442,7 +1442,7 @@ def get_unified_admin_html(admin_data=None):
                 scheduleData.timezone = timezoneSelect.value;
             }}
             
-            console.log('🔄 Updating pod schedule as a group:', scheduleData);
+            console.log("🔄 Updating pod schedule as a group:', scheduleData);
             
             // Make API call to update pod schedule
             fetch(`/api/crud/pods/${{podId}}`, {{
@@ -1454,10 +1454,10 @@ def get_unified_admin_html(admin_data=None):
             .then(data => {{
                 if (data.success) {{
                     alert('Schedule updated successfully!\\nAll meeting fields updated as a group.');
-                    console.log('✅ Schedule updated:', data);
+                    console.log("✅ Schedule updated:', data);
                     
                     // Log the group change for analytics
-                    console.log('📊 Schedule change logged - Day:', scheduleData.meeting_day, 
+                    console.log("📊 Schedule change logged - Day:', scheduleData.meeting_day, 
                               'Time:', scheduleData.meeting_time, 'Timezone:', scheduleData.timezone);
                     
                     // Reload pod data to show updated schedule
@@ -1477,7 +1477,7 @@ def get_unified_admin_html(admin_data=None):
             // Simulate API call to remove member
             if (confirm('Remove this member from the pod?')) {{
                 alert('Member removed successfully!');
-                console.log('Removing member:', memberId);
+                console.log("Removing member:', memberId);
                 // Remove the member item from DOM
                 event.target.closest('.member-item').remove();
             }}
@@ -1501,7 +1501,7 @@ def get_unified_admin_html(admin_data=None):
                 return;
             }}
             
-            console.log('🔄 Adding user', userId, 'to pod', podId);
+            console.log("🔄 Adding user', userId, 'to pod', podId);
             
             // Make API call to add member
             fetch(`/api/crud/pods/${{podId}}/members/${{userId}}`, {{
@@ -1512,7 +1512,7 @@ def get_unified_admin_html(admin_data=None):
             .then(data => {{
                 if (data.success) {{
                     alert('Member added successfully!');
-                    console.log('✅ Member added:', data);
+                    console.log("✅ Member added:', data);
                     
                     // Clear selection
                     select.value = '';
@@ -1534,7 +1534,7 @@ def get_unified_admin_html(admin_data=None):
         function loadUserById(userId) {{
             if (!userId) return;
             
-            console.log('🔄 Loading user data for ID:', userId);
+            console.log("🔄 Loading user data for ID:', userId);
             
             // Set current user ID for role management
             currentUserId = userId;
@@ -1550,7 +1550,7 @@ def get_unified_admin_html(admin_data=None):
                 .then(data => {{
                     if (data.success) {{
                         const user = data.data;
-                        console.log('✅ User data loaded:', user);
+                        console.log("✅ User data loaded:', user);
                         
                         // Update user profile with real data - handle cleaner names
                         let displayName = user.first_name || 'Unknown User';
@@ -1587,7 +1587,7 @@ def get_unified_admin_html(admin_data=None):
                             const userRoles = user.roles || [];
                             const isPaid = userRoles.some(role => role.role === 'paid' || role.role === 'premium');
                             statusSelect.value = isPaid ? 'paid' : 'free';
-                            console.log('✅ Updated status to:', statusSelect.value);
+                            console.log("✅ Updated status to:', statusSelect.value);
                         }}
                         
                         // Update pod assignment dropdown with real data
@@ -1616,7 +1616,7 @@ def get_unified_admin_html(admin_data=None):
                                 podSelect.appendChild(option);
                             }});
                             
-                            console.log('✅ Updated pod assignment to:', userPodId || 'No Pod');
+                            console.log("✅ Updated pod assignment to:', userPodId || 'No Pod');
                         }}
                         
                         // Update join date
@@ -1642,7 +1642,7 @@ def get_unified_admin_html(admin_data=None):
                         const commitments = commitmentData.data;
                         const completedCommitments = commitments.filter(c => c.status === 'completed').length;
                         
-                        console.log('✅ User commitments loaded:', commitments.length);
+                        console.log("✅ User commitments loaded:', commitments.length);
                         
                         // Update commitment metrics
                         const commitmentsMadeField = document.querySelector('#userProfile .field-row:nth-child(2) .metric-value');
@@ -1671,7 +1671,7 @@ def get_unified_admin_html(admin_data=None):
         function loadPodById(podId) {{
             if (!podId) return;
             
-            console.log('🔄 Loading pod data for ID:', podId);
+            console.log("🔄 Loading pod data for ID:', podId);
             
             // Hide empty state and show pod profile with loading state
             document.getElementById('podEmptyState').style.display = 'none';
@@ -1684,7 +1684,7 @@ def get_unified_admin_html(admin_data=None):
                 .then(data => {{
                     if (data.success) {{
                         const pod = data.data;
-                        console.log('✅ Pod data loaded:', pod);
+                        console.log("✅ Pod data loaded:', pod);
                         
                         // Update pod profile with real data
                         document.getElementById('podName').textContent = pod.name || 'Unknown Pod';
@@ -1812,7 +1812,7 @@ def get_unified_admin_html(admin_data=None):
         
         // LOAD DATA FROM API
         async function loadRealData() {
-            console.log('🔄 Loading real data from API... (loadRealData function v3)');
+            console.log("🔄 Loading real data from API... (loadRealData function v3)");
             
             try {
                 // Load users
@@ -1820,7 +1820,7 @@ def get_unified_admin_html(admin_data=None):
                 const usersData = await usersResponse.json();
                 if (usersData.success) {
                     window.realUsers = usersData.data;
-                    console.log('✅ Loaded', window.realUsers.length, 'users from API');
+                    console.log("✅ Loaded', window.realUsers.length, 'users from API');
                 } else {
                     console.error('❌ Failed to load users:', usersData.message);
                     window.realUsers = [];
@@ -1831,7 +1831,7 @@ def get_unified_admin_html(admin_data=None):
                 const podsData = await podsResponse.json();
                 if (podsData.success) {
                     window.realPods = podsData.data;
-                    console.log('✅ Loaded', window.realPods.length, 'pods from API');
+                    console.log("✅ Loaded', window.realPods.length, 'pods from API');
                 } else {
                     console.error('❌ Failed to load pods:', podsData.message);
                     window.realPods = [];
@@ -1850,13 +1850,13 @@ def get_unified_admin_html(admin_data=None):
 
         // POPULATE REAL DATA DROPDOWNS
         function populateDropdowns() {{
-            console.log('🔧 populateDropdowns() called');
-            console.log('📊 window.realUsers:', window.realUsers ? window.realUsers.length : 'undefined');
-            console.log('🏠 window.realPods:', window.realPods ? window.realPods.length : 'undefined');
+            console.log("🔧 populateDropdowns() called');
+            console.log("📊 window.realUsers:', window.realUsers ? window.realUsers.length : 'undefined');
+            console.log("🏠 window.realPods:', window.realPods ? window.realPods.length : 'undefined');
             
             // Populate users dropdown
             const userDropdown = document.getElementById('userDropdown');
-            console.log('🔧 userDropdown element:', userDropdown);
+            console.log("🔧 userDropdown element:', userDropdown);
             
             if (window.realUsers && userDropdown) {{
                 userDropdown.innerHTML = '<option value="">Select User...</option>';
@@ -1875,14 +1875,14 @@ def get_unified_admin_html(admin_data=None):
                     userDropdown.appendChild(option);
                 }});
                 
-                console.log('✅ Populated users dropdown with', window.realUsers.length, 'real users');
+                console.log("✅ Populated users dropdown with', window.realUsers.length, 'real users');
             }} else {{
-                console.log('❌ Could not populate users dropdown - missing data or element');
+                console.log("❌ Could not populate users dropdown - missing data or element');
             }}
             
             // Populate pods dropdown  
             const podDropdown = document.getElementById('podDropdown');
-            console.log('🔧 podDropdown element:', podDropdown);
+            console.log("🔧 podDropdown element:', podDropdown);
             
             if (window.realPods && podDropdown) {{
                 podDropdown.innerHTML = '<option value="">Select Pod...</option>';
@@ -1894,15 +1894,15 @@ def get_unified_admin_html(admin_data=None):
                     podDropdown.appendChild(option);
                 }});
                 
-                console.log('✅ Populated pods dropdown with', window.realPods.length, 'real pods');
+                console.log("✅ Populated pods dropdown with', window.realPods.length, 'real pods');
             }} else {{
-                console.log('❌ Could not populate pods dropdown - missing data or element');
+                console.log("❌ Could not populate pods dropdown - missing data or element');
             }}
         }}
         
         // Multiple attempts to ensure dropdowns populate
         function ensureDropdownsPopulated() {{
-            console.log('🔧 ensureDropdownsPopulated() called');
+            console.log("🔧 ensureDropdownsPopulated() called');
             
             // Load real data from API (which will call populateDropdowns)
             loadRealData();
@@ -1915,27 +1915,27 @@ def get_unified_admin_html(admin_data=None):
         
         // Auto-populate dropdowns on load (but don't auto-show profiles)
         document.addEventListener('DOMContentLoaded', function() {{
-            console.log('🔧 DOM loaded, attempting to populate dropdowns...');
+            console.log("🔧 DOM loaded, attempting to populate dropdowns...');
             ensureDropdownsPopulated();
             // Profiles remain hidden until user selects from dropdown
         }});
         
         // Fallback for late script loading
         if (document.readyState === 'complete' || document.readyState === 'interactive') {{
-            console.log('🔧 DOM already ready, populating dropdowns immediately...');
+            console.log("🔧 DOM already ready, populating dropdowns immediately...');
             ensureDropdownsPopulated();
         }}
         
         // Force population on window load as final fallback
         window.addEventListener('load', function() {{
-            console.log('🔧 Window loaded, final dropdown population attempt...');
+            console.log("🔧 Window loaded, final dropdown population attempt...');
             ensureDropdownsPopulated();
             loadAvailableRoles();
         }});
         
         // COMMITMENT MANAGEMENT FUNCTIONS
         function displayUserCommitments(commitments) {{
-            console.log('🔧 Displaying user commitments:', commitments);
+            console.log("🔧 Displaying user commitments:', commitments);
             
             const commitmentsContainer = document.getElementById('userCommitments');
             if (!commitmentsContainer) return;
@@ -1978,7 +1978,7 @@ def get_unified_admin_html(admin_data=None):
                 commitmentsContainer.appendChild(commitmentDiv);
             }});
             
-            console.log('✅ Displayed', recentCommitments.length, 'commitments');
+            console.log("✅ Displayed', recentCommitments.length, 'commitments');
         }}
         
         function editCommitment(commitmentId) {{
@@ -1989,7 +1989,7 @@ def get_unified_admin_html(admin_data=None):
                 commitmentElement.style.border = '1px solid var(--cyber-blue)';
                 commitmentElement.focus();
                 
-                console.log('📝 Editing commitment:', commitmentId);
+                console.log("📝 Editing commitment:', commitmentId);
             }}
         }}
         
@@ -2006,7 +2006,7 @@ def get_unified_admin_html(admin_data=None):
                 return;
             }}
             
-            console.log('💾 Saving commitment text change:', commitmentId, newText);
+            console.log("💾 Saving commitment text change:', commitmentId, newText);
             
             // Save to API
             fetch(`/api/crud/commitments/${{commitmentId}}`, {{
@@ -2017,7 +2017,7 @@ def get_unified_admin_html(admin_data=None):
             .then(response => response.json())
             .then(data => {{
                 if (data.success) {{
-                    console.log('✅ Commitment updated:', data);
+                    console.log("✅ Commitment updated:', data);
                     
                     // Log the admin change
                     logCommitmentChange(commitmentId, 'text_changed', `Changed text from "${{originalText}}" to "${{newText}}"`);
@@ -2046,7 +2046,7 @@ def get_unified_admin_html(admin_data=None):
             const currentIndex = statuses.indexOf(currentStatus);
             const nextStatus = statuses[(currentIndex + 1) % statuses.length];
             
-            console.log('🔄 Changing commitment status from', currentStatus, 'to', nextStatus);
+            console.log("🔄 Changing commitment status from', currentStatus, 'to', nextStatus);
             
             fetch(`/api/crud/commitments/${{commitmentId}}`, {{
                 method: 'PUT',
@@ -2056,7 +2056,7 @@ def get_unified_admin_html(admin_data=None):
             .then(response => response.json())
             .then(data => {{
                 if (data.success) {{
-                    console.log('✅ Commitment status updated:', data);
+                    console.log("✅ Commitment status updated:', data);
                     
                     // Log the admin change
                     logCommitmentChange(commitmentId, 'status_changed', `Changed status from "${{currentStatus}}" to "${{nextStatus}}"`);
@@ -2082,7 +2082,7 @@ def get_unified_admin_html(admin_data=None):
                 return;
             }}
             
-            console.log('🗑️ Deleting commitment:', commitmentId);
+            console.log("🗑️ Deleting commitment:', commitmentId);
             
             // For now, we'll just mark as deleted rather than actually deleting
             // In a real system, you'd want to preserve the record for audit purposes
@@ -2094,7 +2094,7 @@ def get_unified_admin_html(admin_data=None):
             .then(response => response.json())
             .then(data => {{
                 if (data.success) {{
-                    console.log('✅ Commitment deleted:', data);
+                    console.log("✅ Commitment deleted:', data);
                     
                     // Log the admin change
                     logCommitmentChange(commitmentId, 'deleted', 'Commitment deleted by admin');
@@ -2126,7 +2126,7 @@ def get_unified_admin_html(admin_data=None):
                 return;
             }}
             
-            console.log('➕ Adding new commitment for user:', currentUserId);
+            console.log("➕ Adding new commitment for user:', currentUserId);
             
             // Create commitment via API
             const commitmentData = {{
@@ -2143,7 +2143,7 @@ def get_unified_admin_html(admin_data=None):
             .then(response => response.json())
             .then(data => {{
                 if (data.success) {{
-                    console.log('✅ Commitment created successfully:', data.data);
+                    console.log("✅ Commitment created successfully:', data.data);
                     alert('Commitment created successfully!');
                     
                     // Reload user commitments to show the new one
@@ -2177,7 +2177,7 @@ def get_unified_admin_html(admin_data=None):
                 timestamp: timestamp
             }};
             
-            console.log('📊 Logging commitment change:', logEntry);
+            console.log("📊 Logging commitment change:', logEntry);
             
             // In a real system, this would be sent to an immutable audit log
             // For now, we'll display it in the UI
@@ -2199,7 +2199,7 @@ def get_unified_admin_html(admin_data=None):
         let currentUserId = null;
         
         function displayUserRoles(roles) {{
-            console.log('🔧 Displaying user roles:', roles);
+            console.log("🔧 Displaying user roles:', roles);
             
             const rolesContainer = document.getElementById('userRoles');
             if (!rolesContainer) return;
@@ -2229,13 +2229,13 @@ def get_unified_admin_html(admin_data=None):
         }}
         
         function loadAvailableRoles() {{
-            console.log('🔧 Loading available roles...');
+            console.log("🔧 Loading available roles...');
             
             fetch('/api/crud/roles')
                 .then(response => response.json())
                 .then(data => {{
                     if (data.success) {{
-                        console.log('✅ Available roles loaded:', data.data);
+                        console.log("✅ Available roles loaded:', data.data);
                         populateRoleSelect(data.data);
                     }} else {{
                         console.error('❌ Error loading roles:', data);
@@ -2273,7 +2273,7 @@ def get_unified_admin_html(admin_data=None):
                 return;
             }}
             
-            console.log('🔄 Adding role', role, 'to user', currentUserId);
+            console.log("🔄 Adding role', role, 'to user', currentUserId);
             
             fetch(`/api/crud/users/${{currentUserId}}/roles/${{role}}`, {{
                 method: 'POST',
@@ -2283,7 +2283,7 @@ def get_unified_admin_html(admin_data=None):
             .then(data => {{
                 if (data.success) {{
                     alert(`Role '${{role}}' added successfully!`);
-                    console.log('✅ Role added:', data);
+                    console.log("✅ Role added:', data);
                     
                     // Clear selection
                     roleSelect.value = '';
@@ -2311,7 +2311,7 @@ def get_unified_admin_html(admin_data=None):
                 return;
             }}
             
-            console.log('🔄 Removing role', role, 'from user', currentUserId);
+            console.log("🔄 Removing role', role, 'from user', currentUserId);
             
             fetch(`/api/crud/users/${{currentUserId}}/roles/${{role}}`, {{
                 method: 'DELETE',
@@ -2321,7 +2321,7 @@ def get_unified_admin_html(admin_data=None):
             .then(data => {{
                 if (data.success) {{
                     alert(`Role '${{role}}' removed successfully!`);
-                    console.log('✅ Role removed:', data);
+                    console.log("✅ Role removed:', data);
                     
                     // Reload user data to show updated roles
                     loadUserById(currentUserId);

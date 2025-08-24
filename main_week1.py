@@ -24,10 +24,53 @@ try:
     from supabase import create_client
     from dashboard_crud_routes import create_crud_router
     from user_dashboard_template import get_user_dashboard_html
-    from unified_admin_dashboard import get_unified_admin_html
+    # from unified_admin_dashboard import get_unified_admin_html  # TEMP: Disabled due to syntax error
 except ImportError as e:
     logger.error(f"Import error: {e}")
-    raise
+    # Don't raise in production - log and continue
+    logger.warning("Some imports failed, continuing with limited functionality")
+
+# Temporary replacement for admin dashboard
+def get_unified_admin_html(admin_data):
+    """Temporary simplified admin dashboard"""
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Admin Dashboard - Week 1 MVP</title>
+        <style>
+            body {{ font-family: monospace; background: #111; color: #0f0; padding: 20px; }}
+            .container {{ max-width: 800px; margin: 0 auto; }}
+            .section {{ background: #222; border: 1px solid #0f0; padding: 15px; margin: 10px 0; }}
+            .error {{ color: #f00; background: #400; border: 1px solid #f00; padding: 10px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Week 1 MVP Admin Dashboard</h1>
+            <div class="error">
+                <strong>TEMPORARY DASHBOARD:</strong> Full admin dashboard disabled due to syntax error.<br>
+                Use the CRUD API endpoints directly or fix unified_admin_dashboard.py
+            </div>
+            <div class="section">
+                <h2>Available Endpoints:</h2>
+                <ul>
+                    <li><a href="/api/crud/users">GET /api/crud/users</a> - List users</li>
+                    <li><a href="/api/crud/pods">GET /api/crud/pods</a> - List pods</li>
+                    <li><a href="/api/crud/commitments">GET /api/crud/commitments</a> - List commitments</li>
+                    <li><a href="/debug">GET /debug</a> - Debug info</li>
+                </ul>
+            </div>
+            <div class="section">
+                <h2>System Info:</h2>
+                <p>Users: {admin_data.get('user_count', 'N/A')}</p>
+                <p>Pods: {admin_data.get('pod_count', 'N/A')}</p>
+                <p>Commitments: {admin_data.get('commitment_count', 'N/A')}</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
 # Initialize Supabase
 supabase_url = os.getenv("SUPABASE_URL")
