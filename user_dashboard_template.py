@@ -93,6 +93,9 @@ def get_user_dashboard_html(user_data: dict) -> str:
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;400;700&display=swap');
         
+        /* Cache buster - forces fresh CSS load */
+        html {{ --cache-bust: {user_name}-v2; }}
+        
         * {{
             box-sizing: border-box;
             margin: 0;
@@ -159,10 +162,18 @@ def get_user_dashboard_html(user_data: dict) -> str:
         .viewport {{
             background: var(--deep-black);
             min-height: calc(100vh - 6px);
+            max-width: 600px;
+            margin: 0 auto;
             display: flex;
             flex-direction: column;
             position: relative;
             z-index: 1;
+            box-shadow: 
+                0 0 60px rgba(131,56,236,0.6),
+                0 0 120px rgba(255,0,107,0.3),
+                inset 0 0 40px rgba(58,134,255,0.1);
+            border: 2px solid rgba(131,56,236,0.4);
+            border-radius: 8px;
         }}
         
         .header {{
@@ -213,20 +224,28 @@ def get_user_dashboard_html(user_data: dict) -> str:
         }}
         
         .stat-card {{
-            padding: var(--space-sm) var(--space-md);
-            background: linear-gradient(135deg, rgba(131,56,236,0.03), rgba(255,0,107,0.03));
-            border: 1px solid rgba(131,56,236,0.2);
-            border-radius: 4px;
+            padding: var(--space-md) var(--space-lg);
+            background: linear-gradient(135deg, rgba(131,56,236,0.15), rgba(255,0,107,0.08));
+            border: 1px solid rgba(131,56,236,0.5);
+            border-radius: 8px;
             text-align: center;
             transition: all 0.3s ease;
             position: relative;
             z-index: 10;
+            box-shadow: 
+                0 4px 20px rgba(131,56,236,0.3),
+                0 0 30px rgba(255,0,107,0.15),
+                inset 0 1px 0 rgba(255,255,255,0.05);
         }}
         
         .stat-card:hover {{
             border-color: var(--miami-pink);
-            background: linear-gradient(135deg, rgba(255,0,107,0.08), rgba(131,56,236,0.05));
-            transform: translateY(-2px);
+            background: linear-gradient(135deg, rgba(255,0,107,0.25), rgba(131,56,236,0.15));
+            transform: translateY(-4px);
+            box-shadow: 
+                0 8px 40px rgba(255,0,107,0.4),
+                0 0 60px rgba(131,56,236,0.3),
+                inset 0 1px 0 rgba(255,255,255,0.1);
         }}
         
         .stat-value {{
@@ -240,6 +259,7 @@ def get_user_dashboard_html(user_data: dict) -> str:
             margin-bottom: var(--space-xs);
             position: relative;
             z-index: 20;
+            filter: drop-shadow(0 0 15px rgba(0,255,136,0.8));
         }}
         
         .stat-label {{

@@ -1363,13 +1363,11 @@ def get_unified_admin_html():
             const statusSelect = Array.from(document.querySelectorAll('#podProfile select.field-input')).find(select => 
                 select.parentElement.textContent.includes('Status')
             );
-            const maxMembersField = document.querySelector('#podProfile input[type="number"]');
             
             // Collect pod data
             const podData = {{}};
             if (podNameField) podData.name = podNameField.value;
             if (statusSelect) podData.status = statusSelect.value;
-            if (maxMembersField) podData.max_members = parseInt(maxMembersField.value);
             
             console.log('🔄 Saving pod settings for pod:', podId, podData);
             
@@ -1699,8 +1697,6 @@ def get_unified_admin_html():
                         const podNameField = document.querySelector('#podProfile .profile-section:nth-child(1) input[type="text"]');
                         if (podNameField) podNameField.value = pod.name || '';
                         
-                        const maxMembersField = document.querySelector('#podProfile input[type="number"]');
-                        if (maxMembersField) maxMembersField.value = pod.max_members || 6;
                         
                         // Update created date - find by label text
                         const createdDateField = Array.from(document.querySelectorAll('#podProfile .field-row')).find(row => 
@@ -1797,8 +1793,7 @@ def get_unified_admin_html():
                             );
                             if (memberSectionTitle) {{
                                 const memberCount = pod.members.length;
-                                const maxMembers = pod.max_members || 6;
-                                memberSectionTitle.textContent = `Pod Members (${{memberCount}}/${{maxMembers}})`;
+                                memberSectionTitle.textContent = `Pod Members (${{memberCount}})`;
                             }}
                         }}
                     }} else {{

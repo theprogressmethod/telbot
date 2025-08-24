@@ -24,7 +24,6 @@ class PodUpdateRequest(BaseModel):
     status: Optional[str] = None
     time_utc: Optional[str] = None
     day_of_week: Optional[int] = None
-    max_members: Optional[int] = None
 
 class CommitmentUpdateRequest(BaseModel):
     commitment: Optional[str] = None
