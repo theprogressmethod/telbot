@@ -24,7 +24,7 @@ try:
     from supabase import create_client
     from dashboard_crud_routes import create_crud_router
     from user_dashboard_template import get_user_dashboard_html
-    from unified_admin_dashboard import create_unified_admin_dashboard
+    from unified_admin_dashboard import get_unified_admin_html
 except ImportError as e:
     logger.error(f"Import error: {e}")
     raise
@@ -165,7 +165,7 @@ async def admin_dashboard():
             }
         }
         
-        return create_unified_admin_dashboard(admin_data)
+        return get_unified_admin_html()
         
     except Exception as e:
         logger.error(f"Admin dashboard error: {e}")
