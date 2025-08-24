@@ -12,6 +12,41 @@ from datetime import datetime
 
 app = FastAPI(title="Retro Evolved Dashboard")
 
+# Add CRUD routes for data access
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database connection for CRUD operations"""
+    try:
+        from supabase import create_client
+        import os
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_KEY")
+        
+        if supabase_url and supabase_key:
+            app.state.supabase = create_client(supabase_url, supabase_key)
+            print("✅ Supabase client initialized for evolved dashboard")
+        else:
+            print("⚠️  No Supabase credentials - CRUD operations unavailable")
+            app.state.supabase = None
+    except Exception as e:
+        print(f"❌ Failed to initialize Supabase: {e}")
+        app.state.supabase = None
+
+@app.get("/api/crud/users")
+async def get_users():
+    """Get all users"""
+    try:
+        if not app.state.supabase:
+            return {"success": False, "error": "Database not available"}
+        
+        result = app.state.supabase.table("users").select("*").execute()
+        return {"success": True, "data": result.data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 def get_evolved_superadmin_html():
     """Generate evolved retro terminal dashboard - mobile-first, generous whitespace"""
     environment = os.getenv('ENVIRONMENT', 'development')
@@ -353,6 +388,23 @@ def get_evolved_superadmin_html():
             transform: translateY(-1px);
         }}
         
+        .status-card.placeholder {{
+            opacity: 0.5;
+            border-color: rgba(131,56,236,0.1);
+            background: linear-gradient(135deg, rgba(131,56,236,0.01), rgba(255,0,107,0.01));
+        }}
+        
+        .status-card.placeholder:hover {{
+            opacity: 0.7;
+            transform: none;
+        }}
+        
+        .status-card.placeholder .status-value,
+        .status-card.placeholder .status-label {{
+            text-decoration: line-through;
+            color: var(--gray-600);
+        }}
+        
         .status-value {{
             font-size: var(--text-lg);
             font-weight: 700;
@@ -578,11 +630,7 @@ def get_evolved_superadmin_html():
         <div class="viewport">
             <header class="header">
                 <div class="header-content">
-                    <div class="header-group">
-                        <div class="system-title">System Control</div>
-                        <h1 class="main-title">SUPERADMIN</h1>
-                    </div>
-                    <span class="env-indicator">{environment}</span>
+                    <h1 class="main-title">SUPERADMIN</h1>
                 </div>
             </header>
             
@@ -591,36 +639,36 @@ def get_evolved_superadmin_html():
                 <div class="content-inner">
                     <div class="status-grid">
                         <div class="status-card">
-                            <div class="status-value">1,247</div>
-                            <div class="status-label">Active Users</div>
+                            <div class="status-value">65</div>
+                            <div class="status-label">Total Users</div>
                         </div>
                         <div class="status-card">
-                            <div class="status-value">12</div>
+                            <div class="status-value">13</div>
                             <div class="status-label">Active Pods</div>
                         </div>
                         <div class="status-card">
-                            <div class="status-value">347</div>
-                            <div class="status-label">Paid Users</div>
+                            <div class="status-value">238</div>
+                            <div class="status-label">Total Commitments</div>
                         </div>
                         <div class="status-card">
-                            <div class="status-value">+23%</div>
-                            <div class="status-label">Monthly Growth</div>
+                            <div class="status-value">68.9%</div>
+                            <div class="status-label">Completion Rate</div>
                         </div>
-                        <div class="status-card">
-                            <div class="status-value">$47.2K</div>
-                            <div class="status-label">MRR</div>
+                        <div class="status-card placeholder">
+                            <div class="status-value">~~347~~</div>
+                            <div class="status-label">~~Paid Users~~</div>
                         </div>
-                        <div class="status-card">
-                            <div class="status-value">18</div>
-                            <div class="status-label">Runway (Months)</div>
+                        <div class="status-card placeholder">
+                            <div class="status-value">~~+23%~~</div>
+                            <div class="status-label">~~Monthly Growth~~</div>
                         </div>
-                        <div class="status-card">
-                            <div class="status-value">1.34</div>
-                            <div class="status-label">Viral Coefficient</div>
+                        <div class="status-card placeholder">
+                            <div class="status-value">~~$47.2K~~</div>
+                            <div class="status-label">~~MRR~~</div>
                         </div>
-                        <div class="status-card">
-                            <div class="status-value pulse">98.7%</div>
-                            <div class="status-label">Bot Health</div>
+                        <div class="status-card placeholder">
+                            <div class="status-value">~~1.34~~</div>
+                            <div class="status-label">~~Viral Coefficient~~</div>
                         </div>
                     </div>
                     
@@ -819,8 +867,8 @@ def get_evolved_business_html():
 
 def get_evolved_nurture_html():
     """Generate evolved nurture control dashboard"""
-    from nurture_control_dashboard import get_nurture_control_html
-    return get_nurture_control_html()
+    from nurture_mvp_dashboard import get_nurture_mvp_html
+    return get_nurture_mvp_html()
 
 @app.get("/", response_class=HTMLResponse)
 async def root():

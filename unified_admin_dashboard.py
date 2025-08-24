@@ -852,8 +852,20 @@ def get_unified_admin_html():
                         <div class="profile-section">
                             <div class="section-title">Account Information</div>
                             <div class="field-row">
+                                <span class="field-label">First Name</span>
+                                <input type="text" id="userFirstName" class="field-input" value="">
+                            </div>
+                            <div class="field-row">
+                                <span class="field-label">Last Name</span>
+                                <input type="text" id="userLastName" class="field-input" value="">
+                            </div>
+                            <div class="field-row">
+                                <span class="field-label">Username</span>
+                                <input type="text" id="userUsername" class="field-input" value="">
+                            </div>
+                            <div class="field-row">
                                 <span class="field-label">Email</span>
-                                <input type="email" class="field-input" value="">
+                                <input type="email" id="userEmail" class="field-input" value="">
                             </div>
                             <div class="field-row">
                                 <span class="field-label">Status</span>
@@ -1193,7 +1205,10 @@ def get_unified_admin_html():
             }}
             
             // Get all user account fields
-            const emailField = document.querySelector('#userProfile input[type="email"]');
+            const firstNameField = document.getElementById('userFirstName');
+            const lastNameField = document.getElementById('userLastName');
+            const usernameField = document.getElementById('userUsername');
+            const emailField = document.getElementById('userEmail');
             const statusSelect = Array.from(document.querySelectorAll('#userProfile select.field-input')).find(select => 
                 select.parentElement.textContent.includes('Status')
             );
@@ -1203,7 +1218,20 @@ def get_unified_admin_html():
             
             // Collect user data
             const userData = {{}};
-            if (emailField) userData.email = emailField.value;
+            if (firstNameField && firstNameField.value.trim()) userData.first_name = firstNameField.value.trim();
+            if (lastNameField && lastNameField.value.trim()) userData.last_name = lastNameField.value.trim();
+            if (usernameField && usernameField.value.trim()) userData.username = usernameField.value.trim();
+            
+            // Get current pod assignment for comparison
+            let currentPodId = null;
+            if (podSelect && window.realPods) {{
+                for (const pod of window.realPods) {{
+                    if (pod.members && Array.isArray(pod.members) && pod.members.some(member => member.users?.telegram_user_id == currentUserId)) {{
+                        currentPodId = pod.id;
+                        break;
+                    }}
+                }}
+            }}
             
             console.log('🔄 Saving user account changes for user:', currentUserId, userData);
             
@@ -1227,10 +1255,44 @@ def get_unified_admin_html():
                     }}
                     
                     // Handle pod assignment changes
-                    if (podSelect && podSelect.value) {{
-                        console.log('🔄 Handling pod assignment change to:', podSelect.value);
-                        // Pod assignments are handled through pod membership API
-                        // This would require additional API calls
+                    if (podSelect && podSelect.value !== currentPodId) {{
+                        console.log('🔄 Handling pod assignment change from:', currentPodId, 'to:', podSelect.value);
+                        
+                        // Remove from current pod if assigned
+                        if (currentPodId) {{
+                            fetch(`/api/crud/pods/${{currentPodId}}/members/${{currentUserId}}`, {{
+                                method: 'DELETE'
+                            }})
+                            .then(response => response.json())
+                            .then(data => {{
+                                if (data.success) {{
+                                    console.log('✅ Removed from old pod:', currentPodId);
+                                }} else {{
+                                    console.error('❌ Failed to remove from old pod:', data.message);
+                                }}
+                            }})
+                            .catch(error => console.error('❌ Error removing from pod:', error));
+                        }}
+                        
+                        // Add to new pod if selected
+                        if (podSelect.value) {{
+                            fetch(`/api/crud/pods/${{podSelect.value}}/members/${{currentUserId}}`, {{
+                                method: 'POST'
+                            }})
+                            .then(response => response.json())
+                            .then(data => {{
+                                if (data.success) {{
+                                    console.log('✅ Added to new pod:', podSelect.value);
+                                }} else {{
+                                    console.error('❌ Failed to add to new pod:', data.message);
+                                    alert('Error assigning to pod: ' + (data.message || 'Unknown error'));
+                                }}
+                            }})
+                            .catch(error => {{
+                                console.error('❌ Error adding to pod:', error);
+                                alert('Network error assigning to pod');
+                            }});
+                        }}
                     }}
                     
                     // Reload user data to show updated information
@@ -1508,7 +1570,14 @@ def get_unified_admin_html():
                         document.getElementById('userName').textContent = displayName;
                         
                         // Update user fields with real data
-                        const emailField = document.querySelector('#userProfile input[type="email"]');
+                        const firstNameField = document.getElementById('userFirstName');
+                        const lastNameField = document.getElementById('userLastName');
+                        const usernameField = document.getElementById('userUsername');
+                        const emailField = document.getElementById('userEmail');
+                        
+                        if (firstNameField) firstNameField.value = user.first_name || '';
+                        if (lastNameField) lastNameField.value = user.last_name || '';
+                        if (usernameField) usernameField.value = user.username || '';
                         if (emailField) emailField.value = user.email || '';
                         
                         // Update status dropdown with real data
@@ -1533,7 +1602,7 @@ def get_unified_admin_html():
                             
                             // Check all pods to see which one the user is in
                             for (const pod of window.realPods) {{
-                                if (pod.members && pod.members.some(member => member.users?.telegram_user_id == user.telegram_user_id)) {{
+                                if (pod.members && Array.isArray(pod.members) && pod.members.some(member => member.users?.telegram_user_id == user.telegram_user_id)) {{
                                     userPodId = pod.id;
                                     break;
                                 }}

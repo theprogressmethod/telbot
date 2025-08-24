@@ -281,11 +281,26 @@ class DashboardIntegration:
             return []
     
     async def _get_real_pods_for_dropdown(self) -> List[Dict[str, Any]]:
-        """Get real pods from database for dropdown"""
+        """Get real pods from database for dropdown with member information"""
         try:
-            pods_data = await self.pod_system.list_all_pods()
+            # Get all pods
+            pods_result = self.supabase.table("pods").select("*").execute()
+            if not pods_result.data:
+                return []
+            
+            pods_with_members = []
+            for pod in pods_result.data:
+                # Get members for each pod
+                members_result = self.supabase.table("pod_memberships").select(
+                    "*, users(first_name, telegram_user_id, username)"
+                ).eq("pod_id", pod["id"]).eq("is_active", True).execute()
+                
+                pod_with_members = pod.copy()
+                pod_with_members["members"] = members_result.data if members_result.data else []
+                pods_with_members.append(pod_with_members)
+            
             # Sort by creation date (newest first) and limit to 15 for dropdown
-            sorted_pods = sorted(pods_data, key=lambda x: x.get('created_at', ''), reverse=True)
+            sorted_pods = sorted(pods_with_members, key=lambda x: x.get('created_at', ''), reverse=True)
             return sorted_pods[:15]  # Show 15 most recent pods
         except Exception as e:
             logger.error(f"Error getting real pods: {e}")
