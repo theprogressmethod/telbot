@@ -1,7 +1,7 @@
 services:
-  # Main Bot & API Service
+  # Unified Week 1 MVP Service (Bot + API + Dashboards)
   - type: web
-    name: tpm-bot-api
+    name: telbot-production
     runtime: python
     repo: https://github.com/theprogressmethod/telbot
     branch: staging-clean
@@ -34,40 +34,7 @@ services:
         sync: false
       - key: ADMIN_API_KEY
         sync: false
-    
-    healthCheckPath: /health
-    autoDeploy: true
-
-  # Dashboard Service
-  - type: web
-    name: tpm-dashboards
-    runtime: python
-    repo: https://github.com/theprogressmethod/telbot
-    branch: staging-clean
-    region: oregon
-    plan: standard
-    
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
-    
-    startCommand: |
-      python run_week1_dashboards.py
-    
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
-      - key: ENVIRONMENT
-        value: production
-      - key: PORT
-        value: 8001
-      
-      # Shared secrets with main service
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_KEY
-        sync: false
-      - key: ADMIN_API_KEY
+      - key: WEBHOOK_URL
         sync: false
     
     healthCheckPath: /health
