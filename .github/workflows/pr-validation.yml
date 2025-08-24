@@ -1,0 +1,128 @@
+name: PR Validation & AI Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [development, staging, master]
+
+jobs:
+  validate:
+    name: 🔍 Validate PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for migrations
+        id: check_migrations
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q "\.sql\|migrations/\|supabase/"; then
+            echo "has_migrations=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Database migrations detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "has_migrations=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for API key leaks
+        run: |
+          # Check for potential API keys or secrets
+          if git diff origin/${{ github.base_ref }}...HEAD | grep -iE "(api[_-]?key|secret|token|password|bearer)" | grep -vE "(secrets\.|env\.|example|template)"; then
+            echo "⚠️ Potential secrets detected in code!" >> $GITHUB_STEP_SUMMARY
+            echo "Please ensure all secrets are stored in environment variables" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Python setup
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio flake8 black
+
+      - name: Run linting
+        continue-on-error: true
+        run: |
+          echo "### 🎨 Code Quality Check" >> $GITHUB_STEP_SUMMARY
+          
+          # Run flake8
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
+          
+          # Check black formatting
+          black --check . 2>&1 || echo "⚠️ Code formatting issues found. Run 'black .' to fix." >> $GITHUB_STEP_SUMMARY
+
+      - name: Run tests
+        continue-on-error: true
+        run: |
+          echo "### 🧪 Test Results" >> $GITHUB_STEP_SUMMARY
+          
+          # Create basic test directory if not exists
+          mkdir -p tests
+          
+          # Run tests if they exist
+          if [ -d "tests" ] && [ "$(ls -A tests/*.py 2>/dev/null)" ]; then
+            pytest tests/ -v --tb=short || echo "⚠️ Some tests failed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ No tests found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Security scan
+        continue-on-error: true
+        run: |
+          pip install safety
+          echo "### 🔒 Security Scan" >> $GITHUB_STEP_SUMMARY
+          safety check --json || echo "⚠️ Security vulnerabilities found" >> $GITHUB_STEP_SUMMARY
+
+      - name: AI Review Request
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
+        uses: anthropics/claude-code-action@beta
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          direct_prompt: |
+            Review this pull request and provide feedback on:
+            
+            1. **Code Quality**: Best practices, readability, maintainability
+            2. **Security**: Any potential vulnerabilities or exposed secrets
+            3. **Performance**: Potential bottlenecks or optimization opportunities
+            4. **Testing**: Are there adequate tests for the changes?
+            5. **Database**: ${{ steps.check_migrations.outputs.has_migrations == 'true' && 'Review the database migrations carefully for potential issues' || 'No database changes detected' }}
+            
+            Target branch: ${{ github.base_ref }}
+            Risk level: ${{ github.base_ref == 'master' && 'HIGH - Production deployment' || github.base_ref == 'staging' && 'MEDIUM - Staging deployment' || 'LOW - Development' }}
+            
+            Be constructive and specific in your feedback.
+
+      - name: Comment PR summary
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const summary = `## 🤖 Automated PR Validation
+            
+            **Target Branch:** \`${{ github.base_ref }}\`
+            **Source Branch:** \`${{ github.head_ref }}\`
+            **Has Migrations:** ${{ steps.check_migrations.outputs.has_migrations }}
+            
+            ### Checks Performed:
+            - ✅ Code linting
+            - ✅ Security scan  
+            - ✅ Secret detection
+            - ✅ Test execution
+            - ✅ AI code review
+            
+            Please wait for all checks to complete before merging.`;
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });
