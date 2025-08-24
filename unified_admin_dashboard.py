@@ -1812,7 +1812,7 @@ def get_unified_admin_html(admin_data=None):
         
         // LOAD DATA FROM API
         async function loadRealData() {
-            console.log('🔄 Loading real data from API... (loadRealData function v3)');
+            console.log('🔄 Loading real data from API... (loadRealData function v4-PRODUCTION-FORCED)');
             
             try {
                 // Load users

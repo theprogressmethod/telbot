@@ -91,8 +91,8 @@ async def root():
         "service": "Week 1 MVP - The Progress Method",
         "status": "✅ Running!",
         "timestamp": datetime.now().isoformat(),
-        "git_commit": "77a586d-admin-dropdown-fix",
-        "code_version": "main_week1.py-v3-with-loadRealData",
+        "git_commit": "92339d2-staging-reset-fix", 
+        "code_version": "main_week1.py-v4-PRODUCTION-FORCED",
         "endpoints": {
             "health": "/health",
             "user_dashboard": "/dashboard?user_id=YOUR_USER_ID",
