@@ -1,0 +1,108 @@
+# Supabase Project Configuration
+
+[project]
+id = "apfiwfkpdhslfavnncsl"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+port = 54329
+mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[realtime]
+enabled = true
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://telbot-dev.onrender.com", "https://telbot-staging.onrender.com", "https://telbot-f4on.onrender.com"]
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+
+[auth.external.apple]
+enabled = false
+
+[auth.external.azure]
+enabled = false
+
+[auth.external.bitbucket]
+enabled = false
+
+[auth.external.discord]
+enabled = false
+
+[auth.external.facebook]
+enabled = false
+
+[auth.external.github]
+enabled = false
+
+[auth.external.gitlab]
+enabled = false
+
+[auth.external.google]
+enabled = false
+
+[auth.external.keycloak]
+enabled = false
+
+[auth.external.linkedin]
+enabled = false
+
+[auth.external.notion]
+enabled = false
+
+[auth.external.slack]
+enabled = false
+
+[auth.external.spotify]
+enabled = false
+
+[auth.external.twitch]
+enabled = false
+
+[auth.external.twitter]
+enabled = false
+
+[auth.external.workos]
+enabled = false
+
+[auth.external.zoom]
+enabled = false
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[functions]
+enabled = false
+
+[analytics]
+enabled = false
+port = 54327
