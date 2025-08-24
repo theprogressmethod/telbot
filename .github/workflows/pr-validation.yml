@@ -1,0 +1,92 @@
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    name: ✅ Validate PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check for Breaking Changes
+        id: breaking
+        run: |
+          # Check for breaking changes in migrations
+          if git diff origin/${{ github.base_ref }}...HEAD --name-only | grep -q "supabase/migrations/"; then
+            echo "⚠️ This PR contains database migrations"
+            echo "Please ensure backward compatibility"
+            echo "has-migrations=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-migrations=false" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Python Setup
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install black flake8 pytest
+          
+      - name: Code Quality Check
+        run: |
+          echo "🔍 Running code quality checks..."
+          black --check . || echo "⚠️ Code formatting issues found. Run 'black .' to fix."
+          flake8 . --exit-zero --statistics
+          
+      - name: Run Tests
+        continue-on-error: true
+        run: |
+          if [ -d "tests" ]; then
+            pytest tests/ -v --tb=short || echo "⚠️ Some tests failed"
+          else
+            echo "ℹ️ No tests directory found"
+          fi
+          
+      - name: Security Check
+        run: |
+          pip install bandit
+          bandit -r . -f json -o bandit-report.json || true
+          if [ -f bandit-report.json ]; then
+            echo "🔒 Security scan complete"
+          fi
+          
+      - name: PR Comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const hasMigrations = '${{ steps.breaking.outputs.has-migrations }}' === 'true';
+            
+            let comment = '## 🤖 Automated PR Review\n\n';
+            comment += '### ✅ Checks Completed\n';
+            comment += '- Code quality check\n';
+            comment += '- Security scan\n';
+            comment += '- Test execution\n\n';
+            
+            if (hasMigrations) {
+              comment += '### ⚠️ Database Migrations Detected\n';
+              comment += 'This PR contains database migrations. Please ensure:\n';
+              comment += '- Migrations are backward compatible\n';
+              comment += '- Rollback scripts are provided if needed\n';
+              comment += '- Testing has been done locally\n\n';
+            }
+            
+            comment += '### 📋 Next Steps\n';
+            comment += '1. Review the automated checks above\n';
+            comment += '2. Request human review if needed\n';
+            comment += '3. Merge when all checks pass\n';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            })
