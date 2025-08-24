@@ -1,0 +1,90 @@
+# Claude Orchestra Configuration
+# Central configuration for the orchestration system
+
+system:
+  name: "Claude Orchestra"
+  version: "2.0.0"
+  mode: "production"
+  
+environments:
+  development:
+    branch: "development"
+    auto_deploy: false
+    requires_approval: false
+    test_required: true
+    protected: false
+    
+  staging:
+    branch: "staging"
+    auto_deploy: true
+    requires_approval: false
+    test_required: true
+    protected: true
+    
+  production:
+    branch: "master"
+    auto_deploy: false
+    requires_approval: true
+    test_required: true
+    protected: true
+    rollback_enabled: true
+    
+deployment:
+  provider: "render"
+  services:
+    development:
+      service_id: "srv-d2em4oripnbc73a5bmog"
+      url: "https://telbot-dev.onrender.com"
+      
+    staging:
+      service_id: "srv-d2ftel8gjchc73aekca0"
+      url: "https://telbot-staging.onrender.com"
+      
+    production:
+      service_id: "srv-d2elp8qdbo4c738ir500"
+      url: "https://telbot-f4on.onrender.com"
+      
+database:
+  provider: "supabase"
+  environments:
+    development:
+      project_id: "apfiwfkpdhslfavnncsl"
+      url: "https://apfiwfkpdhslfavnncsl.supabase.co"
+      
+    production:
+      project_id: "prtfkiodnbogqfcztruj"
+      url: "https://prtfkiodnbogqfcztruj.supabase.co"
+      
+safety:
+  max_file_size: 10485760  # 10MB
+  scan_for_secrets: true
+  require_tests: true
+  backup_before_deploy: true
+  
+  protected_paths:
+    - ".env*"
+    - "config/"
+    - "secrets/"
+    - "*.key"
+    - "*.pem"
+    
+  protected_branches:
+    - "master"
+    - "main"
+    - "production"
+    - "staging"
+    
+monitoring:
+  error_tracking: "sentry"
+  uptime_monitoring: "uptimerobot"
+  log_aggregation: "local"
+  
+notifications:
+  slack_webhook: ""
+  email_alerts: []
+  
+features:
+  auto_rollback: true
+  blue_green_deployment: false
+  canary_deployment: false
+  feature_flags: true
