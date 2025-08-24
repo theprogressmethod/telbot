@@ -2090,13 +2090,44 @@ def get_unified_admin_html():
             
             console.log('➕ Adding new commitment for user:', currentUserId);
             
-            // Note: We'd need to add a POST endpoint for creating commitments
-            // For now, this is a placeholder showing the structure
-            alert('Add new commitment functionality would be implemented here.\\nCommitment: ' + commitmentText);
+            // Create commitment via API
+            const commitmentData = {{
+                commitment: commitmentText.trim(),
+                telegram_user_id: parseInt(currentUserId),
+                admin_user_id: "admin-dashboard" // TODO: Replace with actual admin user ID
+            }};
+            
+            fetch('/api/crud/commitments', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify(commitmentData)
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                if (data.success) {{
+                    console.log('✅ Commitment created successfully:', data.data);
+                    alert('Commitment created successfully!');
+                    
+                    // Reload user commitments to show the new one
+                    fetch(`/api/crud/commitments/user/${{currentUserId}}`)
+                        .then(response => response.json())
+                        .then(commitmentData => {{
+                            if (commitmentData.success) {{
+                                displayUserCommitments(commitmentData.data);
+                            }}
+                        }});
+                }} else {{
+                    console.error('❌ Error creating commitment:', data);
+                    alert('Error creating commitment: ' + (data.message || data.detail || 'Unknown error'));
+                }}
+            }})
+            .catch(error => {{
+                console.error('❌ Network error creating commitment:', error);
+                alert('Network error creating commitment. Please try again.');
+            }});
             
             // Log the admin action
-            logCommitmentChange(null, 'created', `Admin created new commitment: "${{commitmentText}}"`);
-        }}
+            logCommitmentChange(null, 'created', `Admin created new commitment: "${{commitmentText}}"`);        }}
         
         function logCommitmentChange(commitmentId, changeType, description) {{
             const timestamp = new Date().toISOString();

@@ -94,7 +94,7 @@ def get_user_dashboard_html(user_data: dict) -> str:
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;400;700&display=swap');
         
         /* Cache buster - forces fresh CSS load */
-        html {{ --cache-bust: {user_name}-v2; }}
+        html {{ --cache-bust: {user_name}-v3-evolved; }}
         
         * {{
             box-sizing: border-box;
@@ -129,70 +129,159 @@ def get_user_dashboard_html(user_data: dict) -> str:
             --text-lg: 1.25rem;
             --text-xl: 1.5rem;
             --text-2xl: 2rem;
+            --text-3xl: 2.5rem;
+            
+            /* Line heights */
+            --leading-tight: 1.1;
+            --leading-normal: 1.5;
+            --leading-loose: 1.75;
+        }}
+        
+        /* Tablet and up - ultra compact */
+        @media (min-width: 768px) {{
+            :root {{
+                --space-xs: 0.375rem;
+                --space-sm: 0.625rem;
+                --space-md: 1rem;
+                --space-lg: 1.375rem;
+                --space-xl: 2rem;
+                --space-2xl: 2.5rem;
+                
+                --text-xs: 0.6875rem;
+                --text-sm: 0.75rem;
+                --text-base: 0.875rem;
+                --text-lg: 1.125rem;
+                --text-xl: 1.5rem;
+                --text-2xl: 1.875rem;
+                --text-3xl: 2.5rem;
+            }}
         }}
         
         body {{
             font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', monospace;
             background: var(--deep-black);
             color: var(--terminal-green);
-            line-height: 1.5;
+            line-height: var(--leading-normal);
             min-height: 100vh;
+            min-height: -webkit-fill-available;
+            overflow-x: hidden;
             position: relative;
+        }}
+        
+        body::before {{
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(255, 0, 107, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(131, 56, 236, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(58, 134, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 90% 90%, rgba(0, 255, 136, 0.08) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
         }}
         
         .frame {{
             min-height: 100vh;
-            background: linear-gradient(135deg, 
-                var(--miami-pink) 0%, 
-                var(--vapor-purple) 25%, 
-                var(--cyber-blue) 50%, 
-                var(--terminal-green) 75%, 
-                var(--sunset-yellow) 100%);
-            background-size: 400% 400%;
-            animation: gradient-shift 8s ease infinite;
-            padding: 3px;
+            min-height: -webkit-fill-available;
+            background: 
+                radial-gradient(2px 2px at 20px 30px, #eee, transparent),
+                radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
+                radial-gradient(1px 1px at 90px 40px, #fff, transparent),
+                radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.6), transparent),
+                radial-gradient(2px 2px at 160px 30px, #fff, transparent),
+                radial-gradient(1px 1px at 200px 60px, rgba(255,255,255,0.9), transparent),
+                radial-gradient(2px 2px at 240px 90px, #eee, transparent),
+                radial-gradient(1px 1px at 280px 40px, rgba(255,255,255,0.7), transparent),
+                radial-gradient(2px 2px at 320px 70px, #fff, transparent),
+                radial-gradient(1px 1px at 360px 20px, rgba(255,255,255,0.8), transparent),
+                radial-gradient(ellipse 800px 200px at 50% 0%, rgba(131,56,236,0.1), transparent),
+                radial-gradient(ellipse 600px 400px at 80% 100%, rgba(255,0,107,0.08), transparent),
+                linear-gradient(180deg, #000011 0%, #0a0a1a 100%);
+            background-size: 
+                400px 200px,
+                400px 200px,
+                400px 200px,
+                400px 200px,
+                400px 200px,
+                400px 200px,
+                400px 200px,
+                400px 200px,
+                400px 200px,
+                400px 200px,
+                100% 100%,
+                100% 100%,
+                100% 100%;
+            background-repeat: repeat;
             position: relative;
         }}
         
-        @keyframes gradient-shift {{
-            0%, 100% {{ background-position: 0% 50%; }}
-            50% {{ background-position: 100% 50%; }}
-        }}
-        
         .viewport {{
-            background: var(--deep-black);
+            background: rgba(0,0,17,0.85);
+            backdrop-filter: blur(1px);
             min-height: calc(100vh - 6px);
+            min-height: calc(-webkit-fill-available - 6px);
             max-width: 600px;
             margin: 0 auto;
             display: flex;
             flex-direction: column;
             position: relative;
             z-index: 1;
-            box-shadow: 
-                0 0 60px rgba(131,56,236,0.6),
-                0 0 120px rgba(255,0,107,0.3),
-                inset 0 0 40px rgba(58,134,255,0.1);
-            border: 2px solid rgba(131,56,236,0.4);
+            border: 1px solid rgba(131,56,236,0.2);
             border-radius: 8px;
         }}
         
         .header {{
-            padding: var(--space-md);
-            background: linear-gradient(180deg, rgba(255,0,107,0.05) 0%, transparent 50%);
-            text-align: center;
-            border-bottom: 1px solid rgba(131,56,236,0.2);
+            padding: var(--space-sm) var(--space-md);
+            background: 
+                linear-gradient(180deg, rgba(255,0,107,0.05) 0%, transparent 50%),
+                linear-gradient(90deg, transparent, rgba(131,56,236,0.03), transparent);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }}
+        
+        .header::after {{
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 1px;
+            background: linear-gradient(90deg, 
+                transparent, 
+                var(--miami-pink), 
+                var(--vapor-purple), 
+                var(--cyber-blue), 
+                transparent);
+            opacity: 0.6;
+        }}
+        
+        @media (min-width: 768px) {{
+            .header::after {{
+                width: 300px;
+            }}
         }}
         
         .user-title {{
             font-size: var(--text-2xl);
             font-weight: 700;
-            background: linear-gradient(135deg, var(--terminal-green), var(--cyber-blue));
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: white;
             margin-bottom: var(--space-xs);
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            text-shadow: 
+                0 0 5px rgba(255,255,255,0.36),
+                0 0 10px rgba(255,255,255,0.28),
+                0 0 14px rgba(131,56,236,0.2),
+                0 0 19px rgba(255,0,107,0.12);
+            filter: drop-shadow(0 0 8px rgba(255,255,255,0.32));
         }}
         
         .user-subtitle {{
@@ -204,10 +293,16 @@ def get_user_dashboard_html(user_data: dict) -> str:
         
         .content {{
             flex: 1;
-            padding: var(--space-md);
+            display: flex;
+            flex-direction: column;
             overflow-y: auto;
             position: relative;
             z-index: 10;
+        }}
+        
+        .content-inner {{
+            padding: var(--space-md);
+            padding-top: var(--space-lg);
         }}
         
         .stats-grid {{
@@ -224,50 +319,48 @@ def get_user_dashboard_html(user_data: dict) -> str:
         }}
         
         .stat-card {{
-            padding: var(--space-md) var(--space-lg);
-            background: linear-gradient(135deg, rgba(131,56,236,0.15), rgba(255,0,107,0.08));
-            border: 1px solid rgba(131,56,236,0.5);
-            border-radius: 8px;
-            text-align: center;
+            padding: var(--space-xs) var(--space-sm);
+            background: linear-gradient(135deg, rgba(131,56,236,0.02), rgba(255,0,107,0.02));
+            border: 1px solid rgba(131,56,236,0.2);
+            border-radius: 2px;
             transition: all 0.3s ease;
             position: relative;
-            z-index: 10;
+            overflow: hidden;
+            text-align: center;
             box-shadow: 
-                0 4px 20px rgba(131,56,236,0.3),
-                0 0 30px rgba(255,0,107,0.15),
-                inset 0 1px 0 rgba(255,255,255,0.05);
+                0 0 15px rgba(131,56,236,0.1),
+                inset 0 0 10px rgba(255,0,107,0.05);
         }}
         
         .stat-card:hover {{
             border-color: var(--miami-pink);
-            background: linear-gradient(135deg, rgba(255,0,107,0.25), rgba(131,56,236,0.15));
-            transform: translateY(-4px);
+            background: linear-gradient(135deg, rgba(255,0,107,0.05), rgba(131,56,236,0.05));
             box-shadow: 
-                0 8px 40px rgba(255,0,107,0.4),
-                0 0 60px rgba(131,56,236,0.3),
-                inset 0 1px 0 rgba(255,255,255,0.1);
+                0 0 40px rgba(255,0,107,0.3),
+                0 0 20px rgba(131,56,236,0.2),
+                inset 0 0 20px rgba(58,134,255,0.1);
+            transform: translateY(-1px);
         }}
         
         .stat-value {{
-            font-size: var(--text-xl);
+            font-size: var(--text-lg);
             font-weight: 700;
             background: linear-gradient(135deg, var(--terminal-green), var(--cyber-blue));
             background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            display: block;
-            margin-bottom: var(--space-xs);
-            position: relative;
-            z-index: 20;
-            filter: drop-shadow(0 0 15px rgba(0,255,136,0.8));
+            margin-bottom: 0;
+            letter-spacing: -0.02em;
+            filter: drop-shadow(0 0 8px rgba(0, 255, 136, 0.5));
         }}
         
         .stat-label {{
             font-size: var(--text-xs);
             color: var(--gray-400);
             text-transform: uppercase;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.05em;
             font-weight: 400;
+            margin-top: var(--space-xs);
         }}
         
         .section {{
@@ -283,8 +376,13 @@ def get_user_dashboard_html(user_data: dict) -> str:
         .section-header h3 {{
             font-size: var(--text-lg);
             font-weight: 700;
-            color: var(--terminal-green);
+            color: white;
             letter-spacing: 0.02em;
+            text-shadow: 
+                0 0 3px rgba(255,255,255,0.36),
+                0 0 6px rgba(255,255,255,0.24),
+                0 0 10px rgba(0,255,136,0.16);
+            filter: drop-shadow(0 0 4px rgba(255,255,255,0.2));
         }}
         
         .pod-card {{
@@ -297,8 +395,11 @@ def get_user_dashboard_html(user_data: dict) -> str:
         .pod-name {{
             font-size: var(--text-lg);
             font-weight: 700;
-            color: var(--cyber-blue);
+            color: white;
             margin-bottom: var(--space-sm);
+            text-shadow: 
+                0 0 3px rgba(255,255,255,0.36),
+                0 0 6px rgba(58,134,255,0.24);
         }}
         
         .pod-details {{
@@ -313,8 +414,11 @@ def get_user_dashboard_html(user_data: dict) -> str:
         
         .pod-stat .stat-value {{
             font-size: var(--text-base);
-            color: var(--terminal-green);
+            color: white;
             font-weight: 700;
+            text-shadow: 
+                0 0 2px rgba(255,255,255,0.32),
+                0 0 5px rgba(0,255,136,0.2);
         }}
         
         .pod-stat .stat-label {{
@@ -364,13 +468,20 @@ def get_user_dashboard_html(user_data: dict) -> str:
         .achievement-badge {{
             display: inline-block;
             padding: var(--space-xs) var(--space-sm);
-            background: linear-gradient(135deg, var(--vapor-purple), var(--miami-pink));
+            background: linear-gradient(135deg, rgba(131,56,236,0.3), rgba(255,0,107,0.3));
             color: white;
+            border: 1px solid rgba(255,255,255,0.3);
             border-radius: 20px;
             font-size: var(--text-sm);
             font-weight: 700;
             margin: var(--space-xs);
-            box-shadow: 0 0 15px rgba(131, 56, 236, 0.3);
+            text-shadow: 
+                0 0 2px rgba(255,255,255,0.36),
+                0 0 5px rgba(255,255,255,0.24);
+            box-shadow: 
+                0 0 8px rgba(131,56,236,0.16),
+                0 0 16px rgba(255,0,107,0.08),
+                inset 0 1px 0 rgba(255,255,255,0.08);
         }}
         
         .no-achievements {{
@@ -439,47 +550,49 @@ def get_user_dashboard_html(user_data: dict) -> str:
     <div class="frame">
         <div class="viewport">
             <header class="header">
-                <h1 class="user-title">{user_name}'s Progress</h1>
+                <h1 class="user-title">{user_name}'S SCOREBOARD</h1>
                 <p class="user-subtitle">Your commitment journey</p>
             </header>
             
             <main class="content">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <span class="stat-value">{total_commitments}</span>
-                        <span class="stat-label">Total</span>
+                <div class="content-inner">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-value">{total_commitments}</span>
+                            <span class="stat-label">Total</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{completed_commitments}</span>
+                            <span class="stat-label">Completed</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{completion_rate}%</span>
+                            <span class="stat-label">Success Rate</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{current_streak}</span>
+                            <span class="stat-label">Current Streak</span>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <span class="stat-value">{completed_commitments}</span>
-                        <span class="stat-label">Completed</span>
+                    
+                    {pod_section}
+                    
+                    <div class="section">
+                        <div class="section-header">
+                            <h3>🏆 Achievements</h3>
+                        </div>
+                        <div class="achievements-section">
+                            {achievements_html}
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <span class="stat-value">{completion_rate}%</span>
-                        <span class="stat-label">Success Rate</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-value">{current_streak}</span>
-                        <span class="stat-label">Current Streak</span>
-                    </div>
-                </div>
-                
-                {pod_section}
-                
-                <div class="section">
-                    <div class="section-header">
-                        <h3>🏆 Achievements</h3>
-                    </div>
-                    <div class="achievements-section">
-                        {achievements_html}
-                    </div>
-                </div>
-                
-                <div class="section">
-                    <div class="section-header">
-                        <h3>📝 Recent Commitments</h3>
-                    </div>
-                    <div class="commitments-list">
-                        {recent_html}
+                    
+                    <div class="section">
+                        <div class="section-header">
+                            <h3>📝 Recent Commitments</h3>
+                        </div>
+                        <div class="commitments-list">
+                            {recent_html}
+                        </div>
                     </div>
                 </div>
             </main>
@@ -518,6 +631,17 @@ def get_user_dashboard_html(user_data: dict) -> str:
             setTimeout(() => {{
                 badge.style.animation = 'fadeIn 0.5s ease forwards';
             }}, index * 100);
+        }});
+        
+        // Touch feedback for interactive elements
+        document.querySelectorAll('.stat-card, .achievement-badge, .pod-card').forEach(el => {{
+            el.addEventListener('touchstart', function() {{
+                this.style.transform = 'scale(0.98)';
+            }});
+            
+            el.addEventListener('touchend', function() {{
+                this.style.transform = '';
+            }});
         }});
         
         // Add CSS for fade-in animation

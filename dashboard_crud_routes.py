@@ -30,6 +30,11 @@ class CommitmentUpdateRequest(BaseModel):
     status: Optional[str] = None
     due_date: Optional[str] = None
 
+class CommitmentCreateRequest(BaseModel):
+    commitment: str
+    telegram_user_id: int
+    admin_user_id: Optional[str] = None  # Admin who created it
+
 def create_crud_router(supabase_client, pod_system):
     """Create CRUD router with dependencies"""
     router = APIRouter(prefix="/api/crud", tags=["Dashboard CRUD"])
@@ -178,6 +183,36 @@ def create_crud_router(supabase_client, pod_system):
             return {"success": True, "data": result.data, "count": len(result.data)}
         except Exception as e:
             logger.error(f"Error fetching commitments for user {user_id}: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @router.post("/commitments")
+    async def create_commitment(commitment_data: CommitmentCreateRequest):
+        """Create a new commitment (admin-created)"""
+        try:
+            from datetime import datetime
+            import uuid
+            
+            # Create commitment with admin attribution
+            commitment_record = {
+                "id": str(uuid.uuid4()),
+                "telegram_user_id": commitment_data.telegram_user_id,
+                "commitment": commitment_data.commitment,
+                "status": "active",
+                "smart_score": 5,  # Default score for admin-created commitments
+                "created_at": datetime.now().isoformat(),
+                "admin_created": True,
+                "admin_user_id": commitment_data.admin_user_id,
+                "created_by": "admin"
+            }
+            
+            result = supabase_client.table("commitments").insert(commitment_record).execute()
+            
+            if not result.data:
+                raise HTTPException(status_code=500, detail="Failed to create commitment")
+            
+            return {"success": True, "data": result.data[0], "message": "Commitment created successfully"}
+        except Exception as e:
+            logger.error(f"Error creating commitment: {e}")
             raise HTTPException(status_code=500, detail=str(e))
     
     @router.put("/commitments/{commitment_id}")
