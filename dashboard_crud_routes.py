@@ -22,8 +22,8 @@ class UserUpdateRequest(BaseModel):
 class PodUpdateRequest(BaseModel):
     name: Optional[str] = None
     status: Optional[str] = None
-    time_utc: Optional[str] = None
-    day_of_week: Optional[int] = None
+    meeting_time: Optional[str] = None  # Updated to match database
+    meeting_day: Optional[int] = None   # Updated to match database
 
 class CommitmentUpdateRequest(BaseModel):
     commitment: Optional[str] = None
@@ -114,7 +114,7 @@ def create_crud_router(supabase_client, pod_system):
     async def get_pod(pod_id: str):
         """Get specific pod by ID"""
         try:
-            result = supabase_client.table("pods").select("*").eq("id", pod_id).execute()
+            result = supabase_client.table("pods").select("id, name, status, meeting_time, meeting_day, max_members, created_at").eq("id", pod_id).execute()
             
             if not result.data:
                 raise HTTPException(status_code=404, detail="Pod not found")
