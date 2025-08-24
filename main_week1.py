@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 try:
     from supabase import create_client
     from dashboard_crud_routes import create_crud_router
-    from user_dashboard_template import create_user_dashboard
-    from unified_admin_dashboard import create_admin_dashboard
+    from user_dashboard_template import get_user_dashboard_html
+    from unified_admin_dashboard import create_unified_admin_dashboard
 except ImportError as e:
     logger.error(f"Import error: {e}")
     raise
@@ -131,7 +131,7 @@ async def user_dashboard(user_id: str):
             }
         }
         
-        return create_user_dashboard(dashboard_data)
+        return get_user_dashboard_html(dashboard_data)
         
     except Exception as e:
         logger.error(f"Dashboard error: {e}")
@@ -165,7 +165,7 @@ async def admin_dashboard():
             }
         }
         
-        return create_admin_dashboard(admin_data)
+        return create_unified_admin_dashboard(admin_data)
         
     except Exception as e:
         logger.error(f"Admin dashboard error: {e}")
