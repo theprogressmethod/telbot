@@ -29,24 +29,34 @@ from aiogram import F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Update
 
-# Import visibility and control systems
-from system_monitor_dashboard import SystemMonitor, create_dashboard_app
-from feature_control_system import FeatureControlSystem, Feature, FeatureFlag, RolloutStrategy
-from testing_optimization_framework import TestingFramework
+# Optional imports for advanced features - make them conditional
+try:
+    from system_monitor_dashboard import SystemMonitor, create_dashboard_app
+    from feature_control_system import FeatureControlSystem, Feature, FeatureFlag, RolloutStrategy
+    from testing_optimization_framework import TestingFramework
+    ADVANCED_FEATURES_AVAILABLE = True
+except ImportError:
+    ADVANCED_FEATURES_AVAILABLE = False
 
-# Import Phase 2 enhancements
-from enhanced_metrics_system import EnhancedMetricsSystem
-from alerting_system import AlertingSystem
-from stakeholder_dashboards import StakeholderDashboards, StakeholderType
-from automated_scheduler import AutomatedScheduler
+try:
+    from enhanced_metrics_system import EnhancedMetricsSystem
+    from alerting_system import AlertingSystem
+    from stakeholder_dashboards import StakeholderDashboards, StakeholderType
+    from automated_scheduler import AutomatedScheduler
+    PHASE2_FEATURES_AVAILABLE = True
+except ImportError:
+    PHASE2_FEATURES_AVAILABLE = False
 
-# Import Phase 3 intelligent systems
-from intelligent_optimization_system import IntelligentOptimizationSystem
-from adaptive_personalization_system import AdaptivePersonalizationSystem
-from predictive_analytics_system import PredictiveAnalyticsSystem
-from auto_scaling_system import AutoScalingSystem
-from ml_insights_system import MLInsightsSystem
-from intelligent_anomaly_detection import IntelligentAnomalyDetection
+try:
+    from intelligent_optimization_system import IntelligentOptimizationSystem
+    from adaptive_personalization_system import AdaptivePersonalizationSystem
+    from predictive_analytics_system import PredictiveAnalyticsSystem
+    from auto_scaling_system import AutoScalingSystem
+    from ml_insights_system import MLInsightsSystem
+    from intelligent_anomaly_detection import IntelligentAnomalyDetection
+    PHASE3_FEATURES_AVAILABLE = True
+except ImportError:
+    PHASE3_FEATURES_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(
@@ -82,21 +92,29 @@ api_key_header = APIKeyHeader(name="X-Admin-Key", auto_error=False)
 async def setup_visibility_systems(config, supabase):
     """Initialize all visibility and control systems"""
     
-    # Initialize monitoring
-    monitor = SystemMonitor(supabase)
+    monitor = None
+    feature_system = None
+    testing_framework = None
     
-    # Initialize feature control
-    feature_system = FeatureControlSystem(supabase)
-    await feature_system.initialize_feature_tables()
-    
-    # Initialize testing framework
-    testing_framework = TestingFramework(supabase)
-    await testing_framework.initialize_testing_tables()
+    if ADVANCED_FEATURES_AVAILABLE:
+        # Initialize monitoring
+        monitor = SystemMonitor(supabase)
+        
+        # Initialize feature control
+        feature_system = FeatureControlSystem(supabase)
+        await feature_system.initialize_feature_tables()
+        
+        # Initialize testing framework
+        testing_framework = TestingFramework(supabase)
+        await testing_framework.initialize_testing_tables()
     
     return monitor, feature_system, testing_framework
 
 async def setup_phase2_systems(monitor, feature_system, testing_framework, supabase):
     """Initialize Phase 2 enhanced systems"""
+    
+    if not PHASE2_FEATURES_AVAILABLE:
+        return None, None, None, None
     
     # Initialize enhanced metrics
     enhanced_metrics = EnhancedMetricsSystem(supabase)
@@ -114,6 +132,9 @@ async def setup_phase2_systems(monitor, feature_system, testing_framework, supab
 
 async def setup_phase3_systems(monitor, enhanced_metrics, alerting_system, predictive_system, supabase):
     """Initialize Phase 3 intelligent systems"""
+    
+    if not PHASE3_FEATURES_AVAILABLE:
+        return None, None, None, None, None, None
     
     # Initialize intelligent optimization system
     optimization_system = IntelligentOptimizationSystem(supabase, enhanced_metrics, monitor)

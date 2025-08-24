@@ -156,13 +156,17 @@ def get_nurture_control_html():
         }}
         
         .title {{
-            color: var(--terminal-green);
             font-size: var(--text-xl);
-            font-weight: 200;
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            background: linear-gradient(135deg, var(--terminal-green), var(--cyber-blue), var(--terminal-green));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             margin-bottom: var(--space-xs);
-            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+            text-shadow: 0 0 40px rgba(0, 255, 136, 0.6);
+            filter: drop-shadow(0 0 20px rgba(58, 134, 255, 0.4));
+            text-transform: uppercase;
         }}
         
         .subtitle {{
@@ -740,7 +744,6 @@ def get_nurture_control_html():
         <div class="dashboard">
             <div class="header">
                 <div class="title">Nurture Control</div>
-                <div class="subtitle">AI-Assisted Message Orchestration • The Progress Method</div>
             </div>
             
             <div class="tab-nav">

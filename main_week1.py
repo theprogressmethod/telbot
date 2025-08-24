@@ -68,9 +68,7 @@ bot: Optional[Bot] = None
 dp: Optional[Dispatcher] = None
 supabase: Optional[Client] = None
 
-# Admin authentication (simplified)
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
+# Admin authentication disabled for Week 1 MVP
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
