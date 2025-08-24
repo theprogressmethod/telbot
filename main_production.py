@@ -56,11 +56,25 @@ try:
 except ImportError:
     StakeholderDashboards = None
 
-# Import Week1 dashboard components
-from dashboard_routes_1_0 import register_week1_dashboard_routes
-from dashboard_integration_1_0 import initialize_dashboard_integration
-from dashboard_crud_routes import create_crud_router
-from basic_pod_system import BasicPodSystem
+# Import Week1 dashboard components (if available)
+try:
+    from dashboard_routes_1_0 import register_week1_dashboard_routes
+except ImportError:
+    register_week1_dashboard_routes = None
+
+try:
+    from dashboard_integration_1_0 import initialize_dashboard_integration
+except ImportError:
+    initialize_dashboard_integration = None
+try:
+    from dashboard_crud_routes import create_crud_router
+except ImportError:
+    create_crud_router = None
+
+try:
+    from basic_pod_system import BasicPodSystem
+except ImportError:
+    BasicPodSystem = None
 
 # Configure logging
 logging.basicConfig(
