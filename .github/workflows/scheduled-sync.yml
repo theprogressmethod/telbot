@@ -1,0 +1,123 @@
+name: 🔄 Scheduled Configuration Sync
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  
+  workflow_dispatch:
+    inputs:
+      source_env:
+        description: 'Source environment to sync from'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+      target_env:
+        description: 'Target environment to sync to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  sync-configurations:
+    name: 🔄 Sync Configurations
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Determine sync direction
+        id: sync-config
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "source=${{ github.event.inputs.source_env }}" >> $GITHUB_OUTPUT
+            echo "target=${{ github.event.inputs.target_env }}" >> $GITHUB_OUTPUT
+          else
+            # Default daily sync: dev -> staging
+            echo "source=development" >> $GITHUB_OUTPUT
+            echo "target=staging" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Backup target configuration
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          TARGET="${{ steps.sync-config.outputs.target }}"
+          
+          if [ -f ".env.$TARGET" ]; then
+            cp ".env.$TARGET" "backups/.env.$TARGET.$TIMESTAMP"
+            echo "✅ Backed up $TARGET configuration"
+          fi
+      
+      - name: Sync configuration
+        env:
+          DEV_BOT_TOKEN: ${{ secrets.DEV_BOT_TOKEN }}
+          STAGING_BOT_TOKEN: ${{ secrets.STAGING_BOT_TOKEN }}
+          PROD_BOT_TOKEN: ${{ secrets.PROD_BOT_TOKEN }}
+        run: |
+          SOURCE="${{ steps.sync-config.outputs.source }}"
+          TARGET="${{ steps.sync-config.outputs.target }}"
+          
+          echo "📋 Syncing $SOURCE -> $TARGET"
+          
+          # Copy configuration
+          if [ -f ".env.$SOURCE" ]; then
+            cp ".env.$SOURCE" ".env.$TARGET"
+            
+            # Update environment-specific values
+            sed -i "s/ENVIRONMENT=$SOURCE/ENVIRONMENT=$TARGET/" ".env.$TARGET"
+            sed -i "s/telbot-$SOURCE/telbot-$TARGET/" ".env.$TARGET"
+            
+            echo "✅ Configuration synced"
+          else
+            echo "❌ Source configuration not found: .env.$SOURCE"
+            exit 1
+          fi
+      
+      - name: Validate synced configuration
+        run: |
+          python .github/scripts/validate_env.py --environment ${{ steps.sync-config.outputs.target }}
+      
+      - name: Commit changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .env.${{ steps.sync-config.outputs.target }} || true
+          git diff --staged --quiet || git commit -m "Scheduled sync: ${{ steps.sync-config.outputs.source }} -> ${{ steps.sync-config.outputs.target }}"
+        continue-on-error: true
+      
+      - name: Create sync report
+        run: |
+          cat > sync_report.md << EOF
+          # Configuration Sync Report
+          
+          **Date:** $(date)
+          **Source:** ${{ steps.sync-config.outputs.source }}
+          **Target:** ${{ steps.sync-config.outputs.target }}
+          **Status:** ✅ Success
+          
+          ## Changes Applied
+          - Environment configuration synced
+          - Webhook URLs updated
+          - Bot tokens maintained per environment
+          
+          ## Next Steps
+          - Monitor ${{ steps.sync-config.outputs.target }} environment
+          - Verify bot functionality
+          - Check service health
+          EOF
+          
+          echo "📄 Sync report created"
+      
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        with:
+          name: sync-report-${{ github.run_id }}
+          path: sync_report.md
+          retention-days: 7

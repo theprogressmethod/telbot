@@ -1,0 +1,4 @@
+# Migrations Directory
+# All database migrations will be stored here
+# Format: [timestamp]_[description].sql
+# Example: 20240101000000_initial_schema.sql
