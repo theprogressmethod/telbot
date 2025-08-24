@@ -29,24 +29,32 @@ from aiogram import F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Update
 
-# Import visibility and control systems
-from system_monitor_dashboard import SystemMonitor, create_dashboard_app
-from feature_control_system import FeatureControlSystem, Feature, FeatureFlag, RolloutStrategy
-from testing_optimization_framework import TestingFramework
+# Import only existing modules
+try:
+    from system_monitor_dashboard import SystemMonitor, create_dashboard_app
+except ImportError:
+    SystemMonitor = None
+    create_dashboard_app = None
 
-# Import Phase 2 enhancements
-from enhanced_metrics_system import EnhancedMetricsSystem
-from alerting_system import AlertingSystem
-from stakeholder_dashboards import StakeholderDashboards, StakeholderType
-from automated_scheduler import AutomatedScheduler
+try:
+    from feature_control_system import FeatureControlSystem, Feature, FeatureFlag, RolloutStrategy
+except ImportError:
+    FeatureControlSystem = None
 
-# Import Phase 3 intelligent systems
-from intelligent_optimization_system import IntelligentOptimizationSystem
-from adaptive_personalization_system import AdaptivePersonalizationSystem
-from predictive_analytics_system import PredictiveAnalyticsSystem
-from auto_scaling_system import AutoScalingSystem
-from ml_insights_system import MLInsightsSystem
-from intelligent_anomaly_detection import IntelligentAnomalyDetection
+try:
+    from enhanced_metrics_system import EnhancedMetricsSystem
+except ImportError:
+    EnhancedMetricsSystem = None
+
+try:
+    from alerting_system import AlertingSystem
+except ImportError:
+    AlertingSystem = None
+
+try:
+    from stakeholder_dashboards import StakeholderDashboards, StakeholderType
+except ImportError:
+    StakeholderDashboards = None
 
 # Import Week1 dashboard components
 from dashboard_routes_1_0 import register_week1_dashboard_routes
