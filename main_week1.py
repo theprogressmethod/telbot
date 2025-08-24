@@ -178,6 +178,43 @@ try:
 except Exception as e:
     logger.error(f"Could not include CRUD router: {e}")
 
+# Telegram Bot Webhook (simplified)
+@app.post("/webhook")
+async def telegram_webhook(request: Request):
+    """Handle Telegram bot webhook"""
+    try:
+        update = await request.json()
+        
+        # Basic bot response - you can enhance this
+        if "message" in update and "text" in update["message"]:
+            chat_id = update["message"]["chat"]["id"]
+            user_message = update["message"]["text"]
+            
+            # Simple response
+            if user_message.startswith("/start"):
+                response_text = "🎯 Welcome to The Progress Method! Your Week 1 MVP is live!"
+            elif user_message.startswith("/dashboard"):
+                user_id = update["message"]["from"]["id"]
+                response_text = f"📊 Your dashboard: https://telbot-production.onrender.com/dashboard?user_id={user_id}"
+            else:
+                response_text = "✅ Your message was received! Week 1 MVP is running."
+            
+            # Send response back to Telegram
+            bot_token = os.getenv("BOT_TOKEN")
+            if bot_token:
+                import aiohttp
+                async with aiohttp.ClientSession() as session:
+                    await session.post(
+                        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                        json={"chat_id": chat_id, "text": response_text}
+                    )
+        
+        return {"status": "ok"}
+        
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return {"status": "error", "message": str(e)}
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
